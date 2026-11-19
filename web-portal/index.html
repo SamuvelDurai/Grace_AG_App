@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GRACE AG — Pastor & Super Admin Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;500;600;700&family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Auth Gate Screen -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-emblem" aria-hidden="true">✝</div>
+        <div>
+          <span class="brand-kicker">CHURCH MANAGEMENT PORTAL</span>
+          <h1>GRACE AG</h1>
+        </div>
+      </div>
+
+      <p class="auth-subtitle">
+        Pastor &amp; Super Admin Web Desk — synced live with the GRACE AG Android mobile app.
+      </p>
+
+      <div id="config-warning" class="alert alert-warning hidden"></div>
+      <div id="auth-error" class="alert alert-error hidden"></div>
+
+      <button id="btn-google-signin" type="button" class="btn btn-google btn-lg btn-full">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.54 5.54 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.54-5.17 3.54-8.87z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z"/>
+          <path fill="#FBBC05" d="M5.28 14.29A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.38-2.29V6.62H1.29A11.98 11.98 0 0 0 0 12c0 1.94.46 3.77 1.29 5.38l3.99-3.09z"/>
+          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.09c.95-2.85 3.6-4.96 6.72-4.96z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+
+      <div class="auth-divider"><span>or sign in with email</span></div>
+
+      <form id="email-login-form" class="stack-sm">
+        <label class="field">
+          <span>Email Address</span>
+          <input id="login-email" type="email" required placeholder="pastor@graceag.org" autocomplete="email" />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input id="login-password" type="password" required placeholder="••••••••" autocomplete="current-password" />
+        </label>
+        <button id="btn-email-signin" type="submit" class="btn btn-primary btn-lg btn-full">
+          Sign In to Portal
+        </button>
+      </form>
+
+      <p class="auth-footnote">
+        Access is restricted to approved <strong>Pastors</strong> and <strong>Super Admins</strong>.
+      </p>
+    </div>
+  </div>
+
+  <!-- Main App Shell -->
+  <div id="app-shell" class="app-shell hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-emblem sm" aria-hidden="true">✝</div>
+        <div class="sidebar-brand-text">
+          <div id="sidebar-church-name" class="sidebar-title">GRACE AG</div>
+          <div id="sidebar-role-badge" class="role-pill">PASTOR</div>
+        </div>
+        <button id="btn-close-sidebar" class="icon-btn mobile-only" type="button" aria-label="Close navigation">✕</button>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Portal Navigation">
+        <div class="nav-section-label">MINISTRY DESK</div>
+        <button class="nav-item active" data-route="overview" type="button">
+          <span class="nav-icon">◈</span><span>Overview</span>
+        </button>
+        <button class="nav-item" data-route="members" type="button">
+          <span class="nav-icon">👥</span><span>Members &amp; Approvals</span>
+          <span id="badge-pending-members" class="nav-badge hidden">0</span>
+        </button>
+        <button class="nav-item" data-route="families" type="button">
+          <span class="nav-icon">🏠</span><span>Families</span>
+        </button>
+        <button class="nav-item" data-route="verses" type="button">
+          <span class="nav-icon">📖</span><span>Daily Bible Verse</span>
+        </button>
+        <button class="nav-item" data-route="announcements" type="button">
+          <span class="nav-icon">📣</span><span>Announcements</span>
+        </button>
+        <button class="nav-item" data-route="prayers" type="button">
+          <span class="nav-icon">🙏</span><span>Prayer Requests</span>
+          <span id="badge-open-prayers" class="nav-badge hidden">0</span>
+        </button>
+        <button class="nav-item" data-route="giving" type="button">
+          <span class="nav-icon">₹</span><span>Giving &amp; Dues</span>
+          <span id="badge-pending-payments" class="nav-badge hidden">0</span>
+        </button>
+        <button class="nav-item" data-route="events" type="button">
+          <span class="nav-icon">📅</span><span>Events</span>
+        </button>
+
+        <div id="super-admin-nav-group" class="hidden">
+          <div class="nav-section-label">SUPER ADMIN</div>
+          <button class="nav-item" data-route="updater" type="button">
+            <span class="nav-icon">⬆</span><span>App Update Pop-Up</span>
+          </button>
+          <button class="nav-item" data-route="church" type="button">
+            <span class="nav-icon">⛪</span><span>Church &amp; Pastors</span>
+          </button>
+          <button class="nav-item" data-route="audit" type="button">
+            <span class="nav-icon">🛡</span><span>Audit Logs</span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="current-user-box">
+          <div id="user-avatar" class="avatar-circle">PA</div>
+          <div class="user-meta">
+            <div id="user-name" class="user-name">Loading...</div>
+            <div id="user-email" class="user-email"></div>
+          </div>
+        </div>
+        <button id="btn-signout" class="btn btn-outline btn-sm btn-full" type="button">Sign Out</button>
+      </div>
+    </aside>
+
+    <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
+
+    <div class="main-column">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="btn-open-sidebar" class="icon-btn mobile-only" type="button" aria-label="Open navigation">☰</button>
+          <div>
+            <h2 id="page-title" class="page-title">Overview</h2>
+            <p id="page-subtitle" class="page-subtitle">Live Firestore sync active</p>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <span class="live-indicator"><span class="live-dot"></span>Live Sync</span>
+          <span id="topbar-church-id" class="chip">church_main</span>
+        </div>
+      </header>
+
+      <main id="page-content" class="page-content"></main>
+    </div>
+  </div>
+
+  <!-- Reusable Modal -->
+  <div id="modal-root" class="modal-root hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title">Modal</h3>
+        <button id="btn-close-modal" class="icon-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast Stack -->
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+  <!-- Injected securely at deploy time by GitHub Actions from GOOGLE_SERVICES_JSON secret -->
+  <script src="./firebase-env.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

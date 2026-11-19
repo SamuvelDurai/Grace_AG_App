@@ -1,0 +1,100 @@
+name: Deploy GRACE AG Web Portal (GitHub Pages)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "web-portal/**"
+      - ".github/workflows/deploy-web-portal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-portal:
+    name: Prepare Web Portal & Inject Firebase Config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Generate Firebase runtime config from GOOGLE_SERVICES_JSON
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          FIREBASE_WEB_APP_ID: ${{ secrets.FIREBASE_WEB_APP_ID }}
+        run: |
+          python3 - <<'PYEOF'
+          import base64, json, os, pathlib, sys
+
+          raw = os.environ.get("GOOGLE_SERVICES_JSON", "").strip()
+          if not raw and pathlib.Path("app/google-services.json").is_file():
+              raw = pathlib.Path("app/google-services.json").read_text(encoding="utf-8").strip()
+
+          if not raw:
+              print("::error::Missing GOOGLE_SERVICES_JSON secret. Add it under Settings -> Secrets and variables -> Actions.")
+              sys.exit(1)
+
+          if not raw.startswith("{"):
+              raw = base64.b64decode("".join(raw.split())).decode("utf-8")
+
+          gs = json.loads(raw)
+          project_info = gs.get("project_info", {})
+          clients = gs.get("client", [])
+          first_client = clients[0] if clients else {}
+          api_keys = first_client.get("api_key", [])
+          api_key = api_keys[0].get("current_key", "") if api_keys else ""
+          project_id = project_info.get("project_id", "")
+          project_number = project_info.get("project_number", "")
+          storage_bucket = project_info.get("storage_bucket", "")
+          app_id = os.environ.get("FIREBASE_WEB_APP_ID", "").strip() or first_client.get("client_info", {}).get("mobilesdk_app_id", "")
+
+          if not api_key or not project_id:
+              print("::error::Could not extract api_key or project_id from GOOGLE_SERVICES_JSON.")
+              sys.exit(1)
+
+          web_config = {
+              "apiKey": api_key,
+              "authDomain": f"{project_id}.firebaseapp.com",
+              "projectId": project_id,
+              "storageBucket": storage_bucket,
+              "messagingSenderId": project_number,
+              "appId": app_id,
+          }
+
+          out_path = pathlib.Path("web-portal/firebase-env.js")
+          out_path.write_text(
+              "// Auto-generated at deploy time by GitHub Actions\n"
+              f"window.__FIREBASE_CONFIG__ = {json.dumps(web_config, indent=2)};\n",
+              encoding="utf-8",
+          )
+          print(f"Generated {out_path} for projectId={project_id}")
+          PYEOF
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Web Portal artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web-portal
+
+  deploy-portal:
+    name: Publish to GitHub Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build-portal
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
