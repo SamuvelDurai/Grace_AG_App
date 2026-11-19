@@ -172,4 +172,11 @@
     <string name="verse_badge_pinned">Pinned Today</string>
     <string name="verse_badge_auto">Auto Daily</string>
     <string name="verse_badge_pastor">Pastor Verse</string>
+    <string name="notif_channel_birthdays_name">Church Family Birthdays</string>
+    <string name="notif_channel_birthdays_desc">Member birthday wishes and weekly reminders for pastors &amp; admins</string>
+    <string name="church_family_birthdays_title">Church Family Birthday Wishes</string>
+    <string name="church_family_birthdays_today_subtitle">Celebrate &amp; bless our church family members today</string>
+    <string name="church_family_birthdays_week_subtitle">Upcoming church family celebrations this week</string>
+    <string name="weekly_birthday_reminder_title">This Week\'s Birthdays Reminder</string>
+    <string name="weekly_birthday_reminder_subtitle">Next 7 days • Pastor &amp; Admin celebration list</string>
 </resources>

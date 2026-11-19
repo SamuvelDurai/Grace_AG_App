@@ -108,6 +108,7 @@ import com.example.presentation.auth.AuthUiState
 import com.example.presentation.auth.AuthViewModel
 import com.example.presentation.common.ChurchSettingsDrawerContent
 import com.example.presentation.common.MemberAvatar
+import com.example.presentation.common.WeeklyBirthdayReminderCard
 import com.example.ui.theme.ClassicChurchBlue
 import com.example.ui.theme.CleanBackground
 import com.example.ui.theme.ErrorRed
@@ -315,6 +316,9 @@ fun SuperAdminDashboardScreen(
             fellowshipRepository = fellowshipRepository,
             churchEventRepository = churchEventRepository,
             churchId = churchId,
+            currentUid = userProfile.uid,
+            actorName = actorName,
+            currentLanguage = currentLanguage,
             onNavigateToAccounts = { selectedTab = 1 },
             onNavigateToChurchConfig = { selectedTab = 2 },
             onNavigateToAuditLogs = { selectedTab = 3 }
@@ -346,6 +350,9 @@ private fun SuperAdminOverviewTab(
   fellowshipRepository: FellowshipRepository,
   churchEventRepository: ChurchEventRepository,
   churchId: String,
+  currentUid: String,
+  actorName: String,
+  currentLanguage: String,
   onNavigateToAccounts: () -> Unit,
   onNavigateToChurchConfig: () -> Unit,
   onNavigateToAuditLogs: () -> Unit
@@ -357,6 +364,9 @@ private fun SuperAdminOverviewTab(
   val groups by fellowshipRepository.observeFellowshipGroups().collectAsState(initial = emptyList())
   val events by churchEventRepository.observeEvents().collectAsState(initial = emptyList())
   val logs by churchAdminRepository.observeAuditLogs(churchId).collectAsState(initial = emptyList())
+  val churchCelebrations by memberRepository.celebrationRepository
+    .observeChurchCelebrations(churchId)
+    .collectAsState(initial = emptyList())
 
   val pastorCount = accounts.count { it.userRole == UserRole.PASTOR && it.status == AccountStatus.APPROVED }
 
@@ -408,6 +418,17 @@ private fun SuperAdminOverviewTab(
           onClick = onNavigateToAuditLogs
         )
       }
+    }
+
+    item {
+      WeeklyBirthdayReminderCard(
+        celebrations = churchCelebrations,
+        churchId = churchId,
+        currentUid = currentUid,
+        actorName = actorName,
+        currentLanguage = currentLanguage,
+        celebrationRepository = memberRepository.celebrationRepository
+      )
     }
 
     item {

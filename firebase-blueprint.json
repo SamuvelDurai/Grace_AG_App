@@ -250,6 +250,24 @@
         "createdAt": { "type": "timestamp", "required": false }
       }
     },
+    "ChurchCelebration": {
+      "collection": "churchCelebrations",
+      "documentId": "celebrationId",
+      "fields": {
+        "celebrationId": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "memberUid": { "type": "string", "required": true },
+        "memberName": { "type": "string", "required": true },
+        "profilePhotoUrl": { "type": "string", "required": false },
+        "type": { "type": "string", "enum": ["BIRTHDAY", "WEDDING_ANNIVERSARY"], "required": true },
+        "monthDay": { "type": "string", "required": true },
+        "displayDate": { "type": "string", "required": false },
+        "wishCount": { "type": "integer", "required": false },
+        "wishedByUids": { "type": "array", "required": false },
+        "recentWishes": { "type": "array", "required": false },
+        "updatedAt": { "type": "timestamp", "required": false }
+      }
+    },
     "AuditLog": {
       "collection": "auditLogs",
       "documentId": "logId",

@@ -23,6 +23,97 @@ const FAMILY_ROLES = [
   "Relative"
 ];
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_MAP = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12
+};
+
+export function parseFlexibleMonthDay(raw) {
+  const input = String(raw || "").trim();
+  if (!input) return null;
+
+  let month = 0;
+  let day = 0;
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  let m = input.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (m) {
+    month = Number(m[2]);
+    day = Number(m[3]);
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  if (!month) {
+    m = input.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (m) {
+      day = Number(m[1]);
+      month = Number(m[2]);
+    }
+  }
+
+  // MM-DD
+  if (!month) {
+    m = input.match(/^(\d{2})-(\d{2})$/);
+    if (m) {
+      month = Number(m[1]);
+      day = Number(m[2]);
+    }
+  }
+
+  // "19 Nov" or "19 November 1995"
+  if (!month) {
+    m = input.match(/^(\d{1,2})\s+([A-Za-z]+)(?:[,\s]+\d{4})?$/);
+    if (m && MONTH_MAP[m[2].toLowerCase()]) {
+      day = Number(m[1]);
+      month = MONTH_MAP[m[2].toLowerCase()];
+    }
+  }
+
+  // "Nov 19" or "November 19, 1995"
+  if (!month) {
+    m = input.match(/^([A-Za-z]+)\s+(\d{1,2})(?:[,\s]+\d{4})?$/);
+    if (m && MONTH_MAP[m[1].toLowerCase()]) {
+      month = MONTH_MAP[m[1].toLowerCase()];
+      day = Number(m[2]);
+    }
+  }
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const mm = String(month).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return {
+    monthDay: `${mm}-${dd}`,
+    displayDate: `${day} ${MONTH_NAMES[month - 1]}`
+  };
+}
+
+export function daysUntilMonthDay(monthDay) {
+  const parts = String(monthDay || "").split("-");
+  if (parts.length !== 2) return 999;
+  const month = Number(parts[0]);
+  const day = Number(parts[1]);
+  if (!month || !day) return 999;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(now.getFullYear(), month - 1, day);
+  if (next < today) {
+    next = new Date(now.getFullYear() + 1, month - 1, day);
+  }
+  return Math.round((next.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+}
+
 export function renderOverviewView(container, state, actions) {
   const approvedMembers = state.users.filter((u) => u.accountStatus === "APPROVED").length;
   const pendingUsers = state.users.filter((u) => u.accountStatus === "PENDING");
@@ -114,6 +205,25 @@ export function renderOverviewView(container, state, actions) {
             </div>
             <button class="btn btn-primary btn-sm" data-goto="prayers" type="button">Respond</button>
           </div>
+          ${(() => {
+            const weekBirthdays = (state.celebrations || []).filter((c) => {
+              const d = daysUntilMonthDay(c.monthDay);
+              return d >= 0 && d <= 7;
+            });
+            const namesPreview = weekBirthdays
+              .slice(0, 3)
+              .map((c) => `${c.memberName} (${daysUntilMonthDay(c.monthDay) === 0 ? "TODAY" : c.displayDate})`)
+              .join(", ");
+            return `
+              <div class="switch-row">
+                <div>
+                  <strong>🎂 ${weekBirthdays.length} Birthday(s) in the Next 7 Days</strong>
+                  <div class="muted">${weekBirthdays.length > 0 ? esc(namesPreview) : "Weekly reminder for Pastor & Admin — add or sync member DOBs"}</div>
+                </div>
+                <button class="btn btn-gold btn-sm" data-goto="birthdays" type="button">Wish / View</button>
+              </div>
+            `;
+          })()}
         </div>
       </section>
     </div>
@@ -877,6 +987,286 @@ export function renderEventsView(container, state, actions) {
   container.querySelectorAll("[data-delete-event]").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (confirm("Delete this event?")) actions.deleteEvent(btn.dataset.deleteEvent);
+    });
+  });
+}
+
+export function renderBirthdaysView(container, state, actions) {
+  const celebrations = state.celebrations || [];
+  const todayList = celebrations.filter((c) => daysUntilMonthDay(c.monthDay) === 0);
+  const weekList = celebrations.filter((c) => {
+    const d = daysUntilMonthDay(c.monthDay);
+    return d >= 0 && d <= 7;
+  });
+
+  const believerByUid = new Map(state.believers.map((b) => [b.uid, b]));
+  const userByUid = new Map(state.users.map((u) => [u.uid, u]));
+
+  const whatsappUrlFor = (cel, tamil = false) => {
+    const b = cel.memberUid ? believerByUid.get(cel.memberUid) : null;
+    const u = cel.memberUid ? userByUid.get(cel.memberUid) : null;
+    const rawPhone = String(b?.phoneNumber || u?.phoneNumber || "").replace(/\D/g, "");
+    const phone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
+    const isAnniv = cel.type === "WEDDING_ANNIVERSARY";
+    const text = tamil
+      ? isAnniv
+        ? `💍 அன்பான ${cel.memberName}, GRACE AG சபைக் குடும்பத்தின் இனிய திருமண நாள் நல்வாழ்த்துக்கள்! கர்த்தர் உங்களை ஆசீர்வதிப்பாராக! 🙏`
+        : `🎂 அன்பான ${cel.memberName}, GRACE AG சபைக் குடும்பத்தின் இனிய பிறந்தநாள் நல்வாழ்த்துக்கள்! 'கர்த்தர் உன்னை ஆசீர்வதித்து, உன்னைக் காக்கக்கடவர்' — எண்ணாகமம் 6:24. 🙏`
+      : isAnniv
+      ? `💍 Happy Wedding Anniversary ${cel.memberName}! Warm wishes from the GRACE AG Church Family! May God bless your home abundantly. 🙏`
+      : `🎂 Happy Birthday ${cel.memberName}! Warm birthday wishes from the GRACE AG Church Family! 'The LORD bless you and keep you' — Numbers 6:24. 🙏`;
+    return phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+  };
+
+  const todayCards = todayList
+    .map((c) => {
+      const isAnniv = c.type === "WEDDING_ANNIVERSARY";
+      const wishes = Array.isArray(c.recentWishes) ? c.recentWishes.slice(0, 3) : [];
+      return `
+        <div class="card card-hero stack-sm">
+          <div class="row-between">
+            <div class="member-cell">
+              ${renderAvatar(c.memberName, c.profilePhotoUrl)}
+              <div>
+                <h3 class="card-title" style="margin:0;">${isAnniv ? "💍" : "🎂"} ${esc(c.memberName)}</h3>
+                <div class="muted">${
+                  isAnniv
+                    ? `Wedding Anniversary wishes from GRACE AG Church Family to ${esc(c.memberName)}!`
+                    : `Birthday wishes from GRACE AG Church Family to ${esc(c.memberName)}!`
+                }</div>
+              </div>
+            </div>
+            <span class="badge badge-gold">TODAY • 🙏 ${Number(c.wishCount || 0)} Wishes</span>
+          </div>
+          ${
+            wishes.length > 0
+              ? `<div class="stack-sm">${wishes
+                  .map(
+                    (w) =>
+                      `<div class="muted" style="font-style:italic;">“${esc(w.message)}” — <strong>${esc(w.senderName)}</strong></div>`
+                  )
+                  .join("")}</div>`
+              : `<div class="muted">Be the first to post a pastoral blessing to the church family card!</div>`
+          }
+          <div class="row-gap">
+            <button class="btn btn-gold btn-sm" data-wish-cel="${esc(c.celebrationId)}" type="button">🙏 Post Church Blessing</button>
+            <a class="btn btn-outline btn-sm" href="${whatsappUrlFor(c, false)}" target="_blank" rel="noopener">WhatsApp (EN)</a>
+            <a class="btn btn-outline btn-sm" href="${whatsappUrlFor(c, true)}" target="_blank" rel="noopener">WhatsApp (தமிழ்)</a>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  const weekRows = weekList
+    .map((c) => {
+      const d = daysUntilMonthDay(c.monthDay);
+      const badge =
+        d === 0
+          ? `<span class="badge badge-gold">TODAY</span>`
+          : d === 1
+          ? `<span class="badge badge-blue">Tomorrow</span>`
+          : `<span class="badge badge-blue">In ${d} days</span>`;
+      const isAnniv = c.type === "WEDDING_ANNIVERSARY";
+      return `
+        <div class="switch-row">
+          <div class="member-cell">
+            ${renderAvatar(c.memberName, c.profilePhotoUrl)}
+            <div>
+              <strong>${isAnniv ? "💍" : "🎂"} ${esc(c.memberName)}</strong>
+              <div class="muted">${esc(c.displayDate)} • 🙏 ${Number(c.wishCount || 0)} church wishes</div>
+            </div>
+          </div>
+          <div class="row-gap">
+            ${badge}
+            <button class="btn btn-primary btn-sm" data-wish-cel="${esc(c.celebrationId)}" type="button">Wish</button>
+            <a class="btn btn-outline btn-sm" href="${whatsappUrlFor(c, false)}" target="_blank" rel="noopener">WhatsApp</a>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  const allRows = celebrations
+    .map((c) => {
+      const d = daysUntilMonthDay(c.monthDay);
+      const when = d === 0 ? "TODAY" : d === 1 ? "Tomorrow" : `In ${d} days`;
+      return `
+        <tr>
+          <td>
+            <div class="member-cell">
+              ${renderAvatar(c.memberName, c.profilePhotoUrl)}
+              <strong>${esc(c.memberName)}</strong>
+            </div>
+          </td>
+          <td>${c.type === "WEDDING_ANNIVERSARY" ? "💍 Anniversary" : "🎂 Birthday"}</td>
+          <td><strong>${esc(c.displayDate)}</strong> <span class="muted">(${when})</span></td>
+          <td>🙏 ${Number(c.wishCount || 0)}</td>
+          <td>
+            <div class="row-gap">
+              <button class="btn btn-primary btn-sm" data-wish-cel="${esc(c.celebrationId)}" type="button">Send Wish</button>
+              <a class="btn btn-outline btn-sm" href="${whatsappUrlFor(c, false)}" target="_blank" rel="noopener">WhatsApp</a>
+              <button class="btn btn-danger btn-sm" data-delete-cel="${esc(c.celebrationId)}" type="button">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const memberOptions = state.believers
+    .map(
+      (b) =>
+        `<option value="${esc(b.uid)}" data-name="${esc(b.fullName || "")}" data-dob="${esc(b.dateOfBirth || "")}" data-photo="${esc(b.profilePhotoUrl || "")}">${esc(b.fullName || b.uid)}${b.dateOfBirth ? ` (${esc(b.dateOfBirth)})` : ""}</option>`
+    )
+    .join("");
+
+  container.innerHTML = `
+    <div class="toolbar">
+      <p class="muted" style="margin:0;">
+        All church members see today's birthday wishes on their home screen and receive a birthday notification alert. Pastors &amp; Admins receive this 7-day weekly reminder.
+      </p>
+      <button id="btn-sync-member-dobs" class="btn btn-outline btn-sm" type="button">↻ Sync Existing Member DOBs</button>
+    </div>
+
+    ${
+      todayCards
+        ? `<div class="stack-md" style="margin-bottom:20px;">${todayCards}</div>`
+        : ""
+    }
+
+    <div class="grid-2" style="margin-bottom:20px;">
+      <section class="card stack-sm">
+        <div class="row-between">
+          <div>
+            <h3 class="card-title">🗓️ This Week's Birthday Reminder (Next 7 Days)</h3>
+            <p class="muted" style="margin:0;">Pastor &amp; Super Admin weekly preparation list</p>
+          </div>
+          <span class="badge badge-gold">${weekList.length} Upcoming</span>
+        </div>
+        <div class="stack-sm">
+          ${weekRows || `<div class="empty-state">No birthdays or anniversaries in the next 7 days.</div>`}
+        </div>
+      </section>
+
+      <section class="card">
+        <h3 class="card-title" style="margin-bottom:14px;">Add Member Birthday / Anniversary</h3>
+        <form id="celebration-form" class="stack-sm">
+          <label class="field">
+            <span>Link Registered Believer (optional)</span>
+            <select id="cel-member-select" name="memberUid">
+              <option value="">— Enter manually —</option>
+              ${memberOptions}
+            </select>
+          </label>
+          <label class="field">
+            <span>Celebration Type</span>
+            <select name="type">
+              <option value="BIRTHDAY">🎂 Birthday</option>
+              <option value="WEDDING_ANNIVERSARY">💍 Wedding Anniversary</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Member / Couple Name *</span>
+            <input id="cel-member-name" name="memberName" required placeholder="e.g. Bro. Samuel Durai" maxlength="150" />
+          </label>
+          <label class="field">
+            <span>Date * (birth year is kept private and never shown)</span>
+            <input id="cel-raw-date" name="rawDate" required placeholder="e.g. 19 Nov or 19/11/1995" />
+          </label>
+          <button class="btn btn-primary btn-lg" type="submit">Save Birthday / Celebration</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Type</th>
+            <th>Celebration Date</th>
+            <th>Church Wishes</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${allRows || `<tr><td colspan="5" class="empty-state">No birthdays saved yet. Add one above or click Sync Existing Member DOBs.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.querySelector("#btn-sync-member-dobs")?.addEventListener("click", () => {
+    actions.syncAllBelieverBirthdays();
+  });
+
+  const memberSelect = container.querySelector("#cel-member-select");
+  memberSelect?.addEventListener("change", (e) => {
+    const opt = e.target.selectedOptions[0];
+    if (!opt || !opt.value) return;
+    const nameInput = container.querySelector("#cel-member-name");
+    const dateInput = container.querySelector("#cel-raw-date");
+    if (nameInput && opt.dataset.name) nameInput.value = opt.dataset.name;
+    if (dateInput && opt.dataset.dob) dateInput.value = opt.dataset.dob;
+  });
+
+  container.querySelector("#celebration-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const selectedOpt = memberSelect?.selectedOptions?.[0];
+    const ok = await actions.saveCelebration({
+      memberUid: fd.get("memberUid") || "",
+      memberName: fd.get("memberName"),
+      rawDate: fd.get("rawDate"),
+      type: fd.get("type"),
+      profilePhotoUrl: selectedOpt?.dataset?.photo || ""
+    });
+    if (ok) e.target.reset();
+  });
+
+  container.querySelectorAll("[data-wish-cel]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = celebrations.find((c) => c.celebrationId === btn.dataset.wishCel);
+      if (!target) return;
+      const defaultMsg =
+        target.type === "WEDDING_ANNIVERSARY"
+          ? `Happy Wedding Anniversary ${target.memberName}! May God's grace and love bless your home! — GRACE AG Church Family 🙏`
+          : `Happy Birthday ${target.memberName}! Warm birthday wishes & blessings from the GRACE AG Church Family! 🙏`;
+      openModal(
+        `🎂 Post Church Family Wish for ${target.memberName}`,
+        `
+        <form id="modal-wish-form" class="stack-sm">
+          <label class="field">
+            <span>Blessing / Birthday Wish (visible to all church members)</span>
+            <textarea name="message" required rows="3" maxlength="280">${esc(defaultMsg)}</textarea>
+          </label>
+          <div class="row-gap" style="justify-content:flex-end;margin-top:8px;">
+            <button class="btn btn-outline" type="button" id="cancel-wish-modal">Cancel</button>
+            <button class="btn btn-primary" type="submit">Post Wish</button>
+          </div>
+        </form>
+        `,
+        (body) => {
+          body.querySelector("#cancel-wish-modal")?.addEventListener("click", closeModal);
+          body.querySelector("#modal-wish-form")?.addEventListener("submit", async (ev) => {
+            ev.preventDefault();
+            const fd = new FormData(ev.target);
+            const ok = await actions.sendBirthdayWish(target.celebrationId, fd.get("message"));
+            if (ok) closeModal();
+          });
+        }
+      );
+    });
+  });
+
+  container.querySelectorAll("[data-delete-cel]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (confirm("Remove this birthday / celebration?")) {
+        actions.deleteCelebration(btn.dataset.deleteCel);
+      }
     });
   });
 }

@@ -9,6 +9,7 @@ import com.example.core.util.FirestoreProvider
 import com.example.core.util.OperationType
 import com.example.core.util.handleFirestoreError
 import com.example.data.family.FamilyRepository
+import com.example.data.pastoralcare.CelebrationRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -28,6 +29,7 @@ class MemberRepository(private val db: FirebaseFirestore) {
 
   private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
   val familyRepository: FamilyRepository = FamilyRepository(db)
+  val celebrationRepository: CelebrationRepository = CelebrationRepository(db)
 
   // Local fallback used strictly when FirebaseAuth has no signed-in user (unit tests)
   private val inMemoryMembers = mutableListOf(
@@ -239,6 +241,10 @@ class MemberRepository(private val db: FirebaseFirestore) {
 
     runCatching {
       familyRepository.syncFromBelieverMember(normalizedMember.copy(memberId = docId, uid = targetUid)).getOrThrow()
+    }
+
+    runCatching {
+      celebrationRepository.syncBirthdayFromBeliever(normalizedMember.copy(memberId = docId, uid = targetUid))
     }
   }
 

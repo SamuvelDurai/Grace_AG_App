@@ -97,6 +97,7 @@ import com.example.presentation.announcement.PastorAnnouncementsScreen
 import com.example.presentation.auth.AuthViewModel
 import com.example.presentation.common.ChurchSettingsDrawerContent
 import com.example.presentation.common.NotificationCenterDialog
+import com.example.presentation.common.WeeklyBirthdayReminderCard
 import com.example.presentation.finance.PastorFinanceScreen
 import com.example.presentation.member.PastorMembersScreen
 import com.example.presentation.ministry.PastorMinistryScreen
@@ -145,11 +146,26 @@ fun PastorDashboardScreen(
   val verseConfigForNotif by bibleContentRepository.observeDailyVerseConfig(churchId)
     .collectAsState(initial = DailyVerseConfig(churchId = churchId))
   val todayAlertsForNotif by pastoralCareRepository.observeTodayAlerts().collectAsState(initial = emptyList())
+  val churchCelebrations by memberRepository.celebrationRepository
+    .observeChurchCelebrations(churchId)
+    .collectAsState(initial = emptyList())
+  val weeklyBirthdays = remember(churchCelebrations) {
+    churchCelebrations.filter { it.isWithinNextWeek() }
+  }
   val todayVerseResolutionForNotif = remember(versesForNotif, verseConfigForNotif) {
     BibleContentRepository.resolveActiveDailyVerse(versesForNotif, verseConfigForNotif)
   }
 
   if (showNotificationCenter) {
+    val notes = buildList {
+      if (weeklyBirthdays.isNotEmpty()) {
+        val names = weeklyBirthdays.take(3).joinToString(", ") { "${it.memberName} (${it.displayDate})" }
+        add("🎂 ${weeklyBirthdays.size} Church Birthday(s) in the next 7 days: $names")
+      }
+      if (todayAlertsForNotif.isNotEmpty()) {
+        add("${todayAlertsForNotif.size} Pastoral Care follow-up alert(s) scheduled for today.")
+      }
+    }
     NotificationCenterDialog(
       churchId = churchId,
       userRole = userProfile.userRole,
@@ -157,9 +173,7 @@ fun PastorDashboardScreen(
       todayVerse = todayVerseResolutionForNotif.verse,
       todayVerseSource = todayVerseResolutionForNotif.source,
       announcements = announcementsForNotif,
-      highlightNote = if (todayAlertsForNotif.isNotEmpty()) {
-        "${todayAlertsForNotif.size} Pastoral Care follow-up alert(s) scheduled for today."
-      } else null,
+      highlightNote = notes.joinToString("\n").ifBlank { null },
       onDismiss = { showNotificationCenter = false }
     )
   }
@@ -347,7 +361,10 @@ fun PastorDashboardScreen(
           prayerRepository = prayerRepository,
           pastoralCareRepository = pastoralCareRepository,
           bibleContentRepository = bibleContentRepository,
+          churchCelebrations = churchCelebrations,
           churchId = churchId,
+          currentUid = userProfile.uid,
+          pastorName = userProfile.displayName.ifBlank { "Senior Pastor" },
           currentLanguage = currentLanguage,
           onNavigateToMembers = { selectedTab = 1 },
           onNavigateToPrayers = {
@@ -410,7 +427,10 @@ private fun PastorHomeTab(
   prayerRepository: PrayerRepository,
   pastoralCareRepository: PastoralCareRepository,
   bibleContentRepository: BibleContentRepository,
+  churchCelebrations: List<com.example.core.model.ChurchCelebration>,
   churchId: String,
+  currentUid: String,
+  pastorName: String,
   currentLanguage: String,
   onNavigateToMembers: () -> Unit = {},
   onNavigateToPrayers: () -> Unit = {},
@@ -439,6 +459,18 @@ private fun PastorHomeTab(
     contentPadding = PaddingValues(16.dp),
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
+    // Weekly Church Birthday Reminder (Next 7 Days) for Pastor
+    item {
+      WeeklyBirthdayReminderCard(
+        celebrations = churchCelebrations,
+        churchId = churchId,
+        currentUid = currentUid,
+        actorName = pastorName,
+        currentLanguage = currentLanguage,
+        celebrationRepository = memberRepository.celebrationRepository
+      )
+    }
+
     // Morning Pastoral Care Alert Card
     item {
       Card(

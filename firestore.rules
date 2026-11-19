@@ -143,6 +143,21 @@ service cloud.firestore {
         data.status in ['PENDING', 'CALLED', 'VISITED', 'PRAYED'];
     }
 
+    function isValidChurchCelebration(data) {
+      return data.celebrationId is string && data.celebrationId.size() > 0 && data.celebrationId.size() <= 120 &&
+        data.churchId is string && data.churchId.size() > 0 &&
+        data.memberUid is string && data.memberUid.size() > 0 &&
+        data.memberName is string && data.memberName.size() > 0 && data.memberName.size() <= 150 &&
+        data.type in ['BIRTHDAY', 'WEDDING_ANNIVERSARY'] &&
+        data.monthDay is string && data.monthDay.matches('^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$') &&
+        (!('displayDate' in data) || (data.displayDate is string && data.displayDate.size() <= 32)) &&
+        (!('profilePhotoUrl' in data) || data.profilePhotoUrl == null ||
+          (data.profilePhotoUrl is string && data.profilePhotoUrl.size() <= 200000)) &&
+        (!('wishCount' in data) || (data.wishCount is int && data.wishCount >= 0 && data.wishCount <= 10000)) &&
+        (!('wishedByUids' in data) || (data.wishedByUids is list && data.wishedByUids.size() <= 1000)) &&
+        (!('recentWishes' in data) || (data.recentWishes is list && data.recentWishes.size() <= 50));
+    }
+
     function isValidChurchConfig(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
         data.defaultLanguage in ['en', 'ta'] &&
@@ -505,6 +520,26 @@ service cloud.firestore {
                        isPastorOrAdmin(request.resource.data.churchId) &&
                        isValidPastoralCareAlert(request.resource.data);
       allow delete: if isSuperAdmin();
+    }
+
+    // Privacy-safe Church Family Birthdays & Wishes (visible to all authenticated members; no phone/address/birth year)
+    match /churchCelebrations/{celebrationId} {
+      allow read: if isAuthenticated();
+      allow create: if (isPastorOrAdmin(request.resource.data.churchId) ||
+                        (isAuthenticated() && request.resource.data.memberUid == request.auth.uid)) &&
+                       isValidChurchCelebration(request.resource.data);
+      allow update: if (
+                         isPastorOrAdmin(request.resource.data.churchId) ||
+                         (isAuthenticated() &&
+                          resource.data.memberUid == request.auth.uid &&
+                          request.resource.data.memberUid == resource.data.memberUid &&
+                          request.resource.data.churchId == resource.data.churchId) ||
+                         (isAuthenticated() &&
+                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wishCount', 'wishedByUids', 'recentWishes', 'updatedAt']) &&
+                          request.resource.data.wishedByUids.hasAll(resource.data.wishedByUids) &&
+                          request.resource.data.wishedByUids.removeAll(resource.data.wishedByUids).hasOnly([request.auth.uid]))
+                       ) && isValidChurchCelebration(request.resource.data);
+      allow delete: if isPastorOrAdmin(resource.data.churchId);
     }
 
     // Audit logs

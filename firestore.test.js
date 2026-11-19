@@ -1156,6 +1156,127 @@ test("Daily verses, auto daily verse config, church update metadata, and fcmToke
   );
 });
 
+test("Church celebrations allow all members to view birthdays and send wishes, block tampering, and let Pastor/Admin manage", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await db.collection("users").doc("pastor_bd").set({
+      uid: "pastor_bd",
+      displayName: "Pastor Thomas",
+      role: "PASTOR",
+      churchId: "church_main",
+      accountStatus: "APPROVED"
+    });
+    await db.collection("users").doc("member_a").set({
+      uid: "member_a",
+      displayName: "Sister Ruth",
+      role: "BELIEVER",
+      churchId: "church_main",
+      accountStatus: "APPROVED"
+    });
+    await db.collection("users").doc("member_b").set({
+      uid: "member_b",
+      displayName: "Brother Paul",
+      role: "BELIEVER",
+      churchId: "church_main",
+      accountStatus: "APPROVED"
+    });
+  });
+
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  const pastorDb = testEnv.authenticatedContext("pastor_bd").firestore();
+  const memberADb = testEnv.authenticatedContext("member_a").firestore();
+  const memberBDb = testEnv.authenticatedContext("member_b").firestore();
+
+  const bdayA = {
+    celebrationId: "bday_member_a",
+    churchId: "church_main",
+    memberUid: "member_a",
+    memberName: "Sister Ruth",
+    profilePhotoUrl: "",
+    type: "BIRTHDAY",
+    monthDay: "11-19",
+    displayDate: "19 Nov",
+    wishCount: 0,
+    wishedByUids: [],
+    recentWishes: []
+  };
+
+  // Unauthenticated cannot read or write
+  await assertFails(unauthDb.collection("churchCelebrations").doc("bday_member_a").set(bdayA));
+
+  // Member B cannot create a birthday record claiming to be Member A
+  await assertFails(memberBDb.collection("churchCelebrations").doc("bday_member_a").set(bdayA));
+
+  // Member A can sync their own birthday record
+  await assertSucceeds(memberADb.collection("churchCelebrations").doc("bday_member_a").set(bdayA));
+
+  // Invalid monthDay rejected even for Pastor
+  await assertFails(
+    pastorDb.collection("churchCelebrations").doc("bday_bad").set({
+      ...bdayA,
+      celebrationId: "bday_bad",
+      memberUid: "custom_1",
+      monthDay: "13-45"
+    })
+  );
+
+  // All authenticated church members can read Member A's birthday
+  await assertSucceeds(memberBDb.collection("churchCelebrations").doc("bday_member_a").get());
+  await assertSucceeds(memberBDb.collection("churchCelebrations").where("churchId", "==", "church_main").get());
+
+  // Member B can send a birthday wish (adding only their own UID)
+  await assertSucceeds(
+    memberBDb.collection("churchCelebrations").doc("bday_member_a").update({
+      wishCount: 1,
+      wishedByUids: ["member_b"],
+      recentWishes: [
+        {
+          senderUid: "member_b",
+          senderName: "Brother Paul",
+          message: "Happy Birthday Sister Ruth! God bless you!",
+          createdAtText: "19 Nov, 09:00 AM"
+        }
+      ]
+    })
+  );
+
+  // Member B CANNOT spoof another member's UID in wishedByUids
+  await assertFails(
+    memberBDb.collection("churchCelebrations").doc("bday_member_a").update({
+      wishCount: 2,
+      wishedByUids: ["member_b", "fake_uid"],
+      recentWishes: []
+    })
+  );
+
+  // Member B CANNOT tamper with memberName or monthDay or delete the record
+  await assertFails(
+    memberBDb.collection("churchCelebrations").doc("bday_member_a").update({
+      memberName: "Hacked Name"
+    })
+  );
+  await assertFails(memberBDb.collection("churchCelebrations").doc("bday_member_a").delete());
+
+  // Pastor can create an anniversary and delete celebrations
+  await assertSucceeds(
+    pastorDb.collection("churchCelebrations").doc("anniv_couple1").set({
+      celebrationId: "anniv_couple1",
+      churchId: "church_main",
+      memberUid: "custom_couple1",
+      memberName: "Bro. David & Sis. Esther",
+      profilePhotoUrl: "",
+      type: "WEDDING_ANNIVERSARY",
+      monthDay: "11-22",
+      displayDate: "22 Nov",
+      wishCount: 0,
+      wishedByUids: [],
+      recentWishes: []
+    })
+  );
+  await assertSucceeds(pastorDb.collection("churchCelebrations").doc("anniv_couple1").delete());
+});
+
+
 
 
 

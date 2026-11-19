@@ -83,6 +83,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
+import com.example.presentation.common.ChurchFamilyBirthdayWishesCard
 import com.example.presentation.common.ChurchSettingsDrawerContent
 import com.example.presentation.common.MemberAvatar
 import com.example.presentation.common.NotificationCenterDialog
@@ -204,6 +205,12 @@ fun BelieverDashboardScreen(
   val todayVerseResolutionForNotif = remember(versesForNotif, verseConfigForNotif) {
     BibleContentRepository.resolveActiveDailyVerse(versesForNotif, verseConfigForNotif)
   }
+  val churchCelebrations by memberRepository.celebrationRepository
+    .observeChurchCelebrations(churchId)
+    .collectAsState(initial = emptyList())
+  val todayChurchBirthdays = remember(churchCelebrations) {
+    churchCelebrations.filter { it.isToday() }
+  }
 
   val observedMember by memberRepository.observeMemberByUid(userProfile.uid).collectAsState(initial = null)
   val baseMember = observedMember ?: BelieverMember(
@@ -305,6 +312,14 @@ fun BelieverDashboardScreen(
   }
 
   if (showNotificationCenter) {
+    val birthdayHighlight = if (todayChurchBirthdays.isNotEmpty()) {
+      val names = todayChurchBirthdays.joinToString(", ") { it.memberName }
+      if (currentLanguage == LanguageManager.LANG_TAMIL) {
+        "🎂 இன்று பிறந்தநாள் வாழ்த்துக்கள்: $names — GRACE AG சபைக் குடும்ப வாழ்த்துக்கள்!"
+      } else {
+        "🎂 Birthday wishes from GRACE AG Church Family today to: $names!"
+      }
+    } else null
     NotificationCenterDialog(
       churchId = churchId,
       userRole = userProfile.userRole,
@@ -312,6 +327,7 @@ fun BelieverDashboardScreen(
       todayVerse = todayVerseResolutionForNotif.verse,
       todayVerseSource = todayVerseResolutionForNotif.source,
       announcements = announcementsForNotif,
+      highlightNote = birthdayHighlight,
       onDismiss = { showNotificationCenter = false }
     )
   }
@@ -504,6 +520,8 @@ fun BelieverDashboardScreen(
           userProfile = userProfile,
           member = effectiveMember,
           churchId = churchId,
+          churchCelebrations = churchCelebrations,
+          memberRepository = memberRepository,
           announcementRepository = announcementRepository,
           financeRepository = financeRepository,
           bibleContentRepository = bibleContentRepository,
@@ -565,6 +583,8 @@ private fun BelieverHomeTab(
   userProfile: UserProfile,
   member: BelieverMember,
   churchId: String,
+  churchCelebrations: List<com.example.core.model.ChurchCelebration>,
+  memberRepository: MemberRepository,
   announcementRepository: AnnouncementRepository,
   financeRepository: FinanceRepository,
   bibleContentRepository: BibleContentRepository,
@@ -657,6 +677,17 @@ private fun BelieverHomeTab(
           }
         }
       }
+    }
+
+    // Church Family Birthday Wishes & This Week's Celebrations (Visible to ALL Members)
+    item {
+      ChurchFamilyBirthdayWishesCard(
+        celebrations = churchCelebrations,
+        currentUid = userProfile.uid,
+        currentUserName = member.fullName.ifBlank { userProfile.displayName.ifBlank { "Church Member" } },
+        currentLanguage = currentLanguage,
+        celebrationRepository = memberRepository.celebrationRepository
+      )
     }
 
     // Daily Bible Verse Card (Always resolved via Pastor Pin / Auto Daily / Pastor Custom)

@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.example.core.localization.LanguageManager
+import com.example.core.model.CelebrationType
 import com.example.core.model.DailyVerseConfig
 import com.example.core.model.PaymentTransactionStatus
 import com.example.core.model.SubscriptionStatus
@@ -22,6 +23,7 @@ import com.example.core.model.UserRole
 import com.example.data.announcement.AnnouncementRepository
 import com.example.data.content.BibleContentRepository
 import com.example.data.finance.FinanceRepository
+import com.example.data.pastoralcare.CelebrationRepository
 
 @Composable
 fun NotificationSyncObserver(
@@ -29,7 +31,8 @@ fun NotificationSyncObserver(
   currentLanguage: String,
   announcementRepository: AnnouncementRepository,
   financeRepository: FinanceRepository,
-  bibleContentRepository: BibleContentRepository
+  bibleContentRepository: BibleContentRepository,
+  celebrationRepository: CelebrationRepository? = null
 ) {
   val context = LocalContext.current
   val churchId = userProfile.churchId.ifBlank { "church_main" }
@@ -75,6 +78,70 @@ fun NotificationSyncObserver(
     .collectAsState(initial = DailyVerseConfig(churchId = churchId))
   LaunchedEffect(verses, dailyConfig) {
     NotificationHelper.cacheDailyVerseSnapshot(context, verses, dailyConfig)
+  }
+
+  // Church Family Birthdays (ALL members get today's birthday alerts; Pastors & Super Admins also get 7-day weekly reminders)
+  if (celebrationRepository != null) {
+    val celebrations by celebrationRepository.observeChurchCelebrations(churchId).collectAsState(initial = emptyList())
+    LaunchedEffect(celebrations, userProfile.role, isTamil) {
+      if (!NotificationHelper.isNoticesEnabled(context) || celebrations.isEmpty()) return@LaunchedEffect
+      val todayKey = BibleContentRepository.todayDateKey()
+
+      val todayCelebrations = celebrations.filter { it.isToday() }
+      todayCelebrations.take(4).forEach { cel ->
+        val isAnniv = cel.celebrationType == CelebrationType.WEDDING_ANNIVERSARY
+        val title = if (isAnniv) {
+          if (isTamil) "💍 திருமண நாள் வாழ்த்துக்கள் ${cel.memberName}!" else "💍 Happy Anniversary ${cel.memberName}!"
+        } else {
+          if (isTamil) "🎂 பிறந்தநாள் வாழ்த்துக்கள் ${cel.memberName}!" else "🎂 Happy Birthday ${cel.memberName}!"
+        }
+        val body = if (isAnniv) {
+          if (isTamil) {
+            "GRACE AG சபைக் குடும்பத்தின் திருமண நாள் வாழ்த்துக்கள் — ${cel.memberName}! வாழ்த்து அனுப்ப தட்டவும்."
+          } else {
+            "Anniversary wishes from GRACE AG Church Family to ${cel.memberName}! Tap to send your blessing."
+          }
+        } else {
+          if (isTamil) {
+            "GRACE AG சபைக் குடும்பத்தின் பிறந்தநாள் வாழ்த்துக்கள் — ${cel.memberName}! வாழ்த்து அனுப்ப தட்டவும்."
+          } else {
+            "Birthday wishes from GRACE AG Church Family to ${cel.memberName}! Tap to send your blessing."
+          }
+        }
+        NotificationHelper.notifyIfNew(
+          context = context,
+          dedupeKey = "bday_${todayKey}_${cel.celebrationId}",
+          channelId = NotificationHelper.CHANNEL_BIRTHDAYS,
+          title = title,
+          body = body
+        )
+      }
+
+      if (userProfile.userRole == UserRole.PASTOR || userProfile.userRole == UserRole.SUPER_ADMIN) {
+        val upcomingWeek = celebrations.filter { it.isWithinNextWeek() }
+        if (upcomingWeek.isNotEmpty()) {
+          val summaryList = upcomingWeek.take(5).joinToString(" • ") { item ->
+            val whenText = when (item.daysUntil()) {
+              0 -> if (isTamil) "இன்று" else "Today"
+              1 -> if (isTamil) "நாளை" else "Tomorrow"
+              else -> item.displayDate
+            }
+            "${item.memberName} ($whenText)"
+          }
+          NotificationHelper.notifyIfNew(
+            context = context,
+            dedupeKey = "weekly_bday_${todayKey}_${upcomingWeek.size}",
+            channelId = NotificationHelper.CHANNEL_BIRTHDAYS,
+            title = if (isTamil) {
+              "🗓️ இந்த வார சபை பிறந்தநாள்கள் (${upcomingWeek.size})"
+            } else {
+              "🗓️ This Week's Church Birthdays (${upcomingWeek.size})"
+            },
+            body = summaryList
+          )
+        }
+      }
+    }
   }
 
   // Notify on newly added Announcements (suppressing startup historical announcements)

@@ -190,7 +190,8 @@ fun AppNavigation(
                 currentLanguage = currentLanguage,
                 announcementRepository = announcementRepository,
                 financeRepository = financeRepository,
-                bibleContentRepository = bibleContentRepository
+                bibleContentRepository = bibleContentRepository,
+                celebrationRepository = memberRepository.celebrationRepository
               )
               AppUpdateChecker(
                 churchAdminRepository = churchAdminRepository,

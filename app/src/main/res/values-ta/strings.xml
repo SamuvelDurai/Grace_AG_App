@@ -172,4 +172,11 @@
     <string name="verse_badge_pinned">இன்றைய சிறப்பு</string>
     <string name="verse_badge_auto">தினசரி தானியங்கி</string>
     <string name="verse_badge_pastor">போதகர் வசனம்</string>
+    <string name="notif_channel_birthdays_name">சபைக் குடும்ப பிறந்தநாள்கள்</string>
+    <string name="notif_channel_birthdays_desc">உறுப்பினர்கள் பிறந்தநாள் வாழ்த்துகள் மற்றும் வாராந்திர நினைவூட்டல்கள்</string>
+    <string name="church_family_birthdays_title">சபைக் குடும்ப பிறந்தநாள் வாழ்த்துக்கள்</string>
+    <string name="church_family_birthdays_today_subtitle">இன்று பிறந்தநாள் காணும் சபை உறுப்பினர்களை வாழ்த்துங்கள்</string>
+    <string name="church_family_birthdays_week_subtitle">இந்த வாரம் வரும் சபை கொண்டாட்டங்கள்</string>
+    <string name="weekly_birthday_reminder_title">இந்த வார பிறந்தநாள் நினைவூட்டல்</string>
+    <string name="weekly_birthday_reminder_subtitle">அடுத்த 7 நாட்கள் • போதகர் &amp; நிர்வாகப் பட்டியல்</string>
 </resources>

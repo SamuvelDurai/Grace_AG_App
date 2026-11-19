@@ -41,6 +41,7 @@ object NotificationHelper {
   const val CHANNEL_NOTICES = "grace_ag_notices"
   const val CHANNEL_DAILY_VERSE = "grace_ag_daily_verse"
   const val CHANNEL_ACCOUNT = "grace_ag_account"
+  const val CHANNEL_BIRTHDAYS = "grace_ag_birthdays"
 
   fun isDailyVerseEnabled(context: Context): Boolean {
     val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -90,7 +91,15 @@ object NotificationHelper {
       description = context.getString(R.string.notif_channel_account_desc)
     }
 
-    manager.createNotificationChannels(listOf(noticesChannel, verseChannel, accountChannel))
+    val birthdaysChannel = NotificationChannel(
+      CHANNEL_BIRTHDAYS,
+      context.getString(R.string.notif_channel_birthdays_name),
+      NotificationManager.IMPORTANCE_HIGH
+    ).apply {
+      description = context.getString(R.string.notif_channel_birthdays_desc)
+    }
+
+    manager.createNotificationChannels(listOf(noticesChannel, verseChannel, accountChannel, birthdaysChannel))
   }
 
   fun showNotification(
@@ -261,11 +270,14 @@ object NotificationHelper {
       val noticesTopic = "${cleanChurchId}_notices"
       val verseTopic = "${cleanChurchId}_daily_verse"
       val pastorsTopic = "${cleanChurchId}_pastors"
+      val birthdaysTopic = "${cleanChurchId}_birthdays"
 
       if (noticesEnabled) {
         messaging.subscribeToTopic(noticesTopic)
+        messaging.subscribeToTopic(birthdaysTopic)
       } else {
         messaging.unsubscribeFromTopic(noticesTopic)
+        messaging.unsubscribeFromTopic(birthdaysTopic)
       }
 
       if (dailyVerseEnabled) {

@@ -28,7 +28,10 @@ import {
 import { closeModal, initials, randomId, showToast } from "./utils.js";
 import { todayDateKey } from "./verses-catalog.js";
 import {
+  daysUntilMonthDay,
+  parseFlexibleMonthDay,
   renderAnnouncementsView,
+  renderBirthdaysView,
   renderDailyVerseView,
   renderEventsView,
   renderFamiliesView,
@@ -47,6 +50,7 @@ const ROUTE_META = {
   overview: { title: "Overview", subtitle: "Live church summary & action queue" },
   members: { title: "Members & Approvals", subtitle: "Directory, profile photos & membership approvals" },
   families: { title: "Church Families", subtitle: "Household heads, roles & linked believer accounts" },
+  birthdays: { title: "Birthdays & Church Family Wishes", subtitle: "Weekly 7-day Pastor/Admin reminder & church-wide birthday wishes" },
   verses: { title: "Daily Bible Verse", subtitle: "Pastor daily verse composer & Auto-Verse automation" },
   announcements: { title: "Announcements", subtitle: "Bilingual church broadcasts synced to all phones" },
   prayers: { title: "Prayer Requests", subtitle: "Pastoral intercession queue & encouragement notes" },
@@ -73,6 +77,7 @@ const state = {
   subscriptions: [],
   offerings: [],
   events: [],
+  celebrations: [],
   auditLogs: [],
   ui: {
     memberSearch: "",
@@ -300,6 +305,12 @@ function subscribeChurchData() {
       .sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
   }, "events");
 
+  watch(query(collection(db, "churchCelebrations"), where("churchId", "==", churchId), limit(250)), (snap) => {
+    state.celebrations = snap.docs
+      .map((d) => ({ celebrationId: d.id, ...d.data() }))
+      .sort((a, b) => daysUntilMonthDay(a.monthDay) - daysUntilMonthDay(b.monthDay));
+  }, "churchCelebrations");
+
   if (isSuperAdmin) {
     watch(query(collection(db, "auditLogs"), where("churchId", "==", churchId), limit(100)), (snap) => {
       state.auditLogs = snap.docs
@@ -322,6 +333,13 @@ function updateNavBadges() {
     "badge-pending-payments",
     state.subscriptions.filter((s) => s.status === "PENDING_VERIFICATION").length +
       state.offerings.filter((o) => o.status === "PENDING").length
+  );
+  setBadge(
+    "badge-week-birthdays",
+    state.celebrations.filter((c) => {
+      const d = daysUntilMonthDay(c.monthDay);
+      return d >= 0 && d <= 7;
+    }).length
   );
 }
 
@@ -651,6 +669,142 @@ const actions = {
     }
   },
 
+  async saveCelebration({ memberName, rawDate, type = "BIRTHDAY", memberUid = "", profilePhotoUrl = "" }) {
+    try {
+      const cleanName = String(memberName || "").trim();
+      if (!cleanName) throw new Error("Member name is required.");
+      const parsed = parseFlexibleMonthDay(rawDate);
+      if (!parsed) throw new Error("Enter a valid date like 19 Nov, 19/11/1995, or 1995-11-19.");
+
+      const safeType = type === "WEDDING_ANNIVERSARY" ? "WEDDING_ANNIVERSARY" : "BIRTHDAY";
+      const prefix = safeType === "BIRTHDAY" ? "bday" : "anniv";
+      const cleanUid = String(memberUid || "").trim() || randomId("custom", 8);
+      const celebrationId = `${prefix}_${cleanUid}`;
+      const docRef = doc(db, "churchCelebrations", celebrationId);
+      const existingSnap = await getDoc(docRef);
+
+      const payload = {
+        celebrationId,
+        churchId: state.churchId,
+        memberUid: cleanUid,
+        memberName: cleanName.slice(0, 150),
+        profilePhotoUrl: String(profilePhotoUrl || "").trim(),
+        type: safeType,
+        monthDay: parsed.monthDay,
+        displayDate: parsed.displayDate,
+        updatedAt: serverTimestamp()
+      };
+      if (!existingSnap.exists()) {
+        payload.wishCount = 0;
+        payload.wishedByUids = [];
+        payload.recentWishes = [];
+      }
+
+      await setDoc(docRef, payload, { merge: true });
+      await recordAuditLog(`Web Portal: Saved ${safeType} for ${cleanName} (${parsed.displayDate})`);
+      showToast(`Saved ${safeType === "BIRTHDAY" ? "birthday" : "anniversary"} for ${cleanName}!`, "success");
+      return true;
+    } catch (err) {
+      showToast(`Could not save celebration: ${err.message}`, "error");
+      return false;
+    }
+  },
+
+  async sendBirthdayWish(celebrationId, message) {
+    try {
+      const cleanMessage = String(message || "").trim();
+      if (!cleanMessage) throw new Error("Wish message cannot be empty.");
+      const docRef = doc(db, "churchCelebrations", celebrationId);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) throw new Error("Celebration record not found.");
+      const current = snap.data();
+      const senderUid = auth.currentUser.uid;
+      const senderName = state.currentUserProfile?.displayName || "Pastor";
+      const timeText = new Date().toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      const existingUids = Array.isArray(current.wishedByUids) ? current.wishedByUids : [];
+      const nextUids = Array.from(new Set([...existingUids, senderUid]));
+      const existingWishes = Array.isArray(current.recentWishes) ? current.recentWishes : [];
+      const nextWishes = [
+        {
+          senderUid,
+          senderName,
+          message: cleanMessage.slice(0, 280),
+          createdAtText: timeText
+        },
+        ...existingWishes.filter((w) => w.senderUid !== senderUid)
+      ].slice(0, 25);
+
+      await updateDoc(docRef, {
+        wishCount: nextUids.length,
+        wishedByUids: nextUids,
+        recentWishes: nextWishes,
+        updatedAt: serverTimestamp()
+      });
+      showToast(`Church blessing posted for ${current.memberName || "member"}!`, "success");
+      return true;
+    } catch (err) {
+      showToast(`Could not post wish: ${err.message}`, "error");
+      return false;
+    }
+  },
+
+  async deleteCelebration(celebrationId) {
+    try {
+      await deleteDoc(doc(db, "churchCelebrations", celebrationId));
+      showToast("Celebration removed.", "success");
+    } catch (err) {
+      showToast(`Delete failed: ${err.message}`, "error");
+    }
+  },
+
+  async syncAllBelieverBirthdays() {
+    try {
+      const userByUid = new Map(state.users.map((u) => [u.uid, u]));
+      let synced = 0;
+      for (const b of state.believers) {
+        if (!b.uid || !b.dateOfBirth) continue;
+        const parsed = parseFlexibleMonthDay(b.dateOfBirth);
+        if (!parsed) continue;
+        const celebrationId = `bday_${b.uid}`;
+        const docRef = doc(db, "churchCelebrations", celebrationId);
+        const existingSnap = await getDoc(docRef);
+        const u = userByUid.get(b.uid);
+        const payload = {
+          celebrationId,
+          churchId: b.churchId || state.churchId,
+          memberUid: b.uid,
+          memberName: String(b.fullName || u?.displayName || "Church Member").trim().slice(0, 150),
+          profilePhotoUrl: b.profilePhotoUrl || u?.photoUrl || "",
+          type: "BIRTHDAY",
+          monthDay: parsed.monthDay,
+          displayDate: parsed.displayDate,
+          updatedAt: serverTimestamp()
+        };
+        if (!existingSnap.exists()) {
+          payload.wishCount = 0;
+          payload.wishedByUids = [];
+          payload.recentWishes = [];
+        }
+        await setDoc(docRef, payload, { merge: true });
+        synced += 1;
+      }
+      await recordAuditLog(`Web Portal: Synced ${synced} member DOB(s) into Church Birthdays`);
+      showToast(
+        synced > 0
+          ? `Synced ${synced} member birthday(s) from believer profiles!`
+          : "No believer profiles have a Date of Birth saved yet.",
+        synced > 0 ? "success" : "info"
+      );
+    } catch (err) {
+      showToast(`Sync failed: ${err.message}`, "error");
+    }
+  },
+
   async saveChurchConfig(config) {
     try {
       const normalized = {
@@ -744,6 +898,7 @@ function renderCurrentRoute() {
     case "overview": return renderOverviewView(container, state, actions);
     case "members": return renderMembersView(container, state, actions);
     case "families": return renderFamiliesView(container, state, actions);
+    case "birthdays": return renderBirthdaysView(container, state, actions);
     case "verses": return renderDailyVerseView(container, state, actions);
     case "announcements": return renderAnnouncementsView(container, state, actions);
     case "prayers": return renderPrayersView(container, state, actions);
