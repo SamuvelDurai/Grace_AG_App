@@ -46,52 +46,77 @@ jobs:
             SDKMANAGER="$(find "${SDK_ROOT}/cmdline-tools" -maxdepth 3 -name sdkmanager -type f 2>/dev/null | head -n 1 || true)"
           fi
 
-          if [ -z "$SDKMANAGER" ]; then
-            echo "::error::Could not locate Android sdkmanager under ${SDK_ROOT}"
-            exit 1
+          if [ -n "$SDKMANAGER" ]; then
+            echo "Using sdkmanager: ${SDKMANAGER}"
+            set +o pipefail
+            yes | "$SDKMANAGER" --sdk_root="${SDK_ROOT}" --licenses >/dev/null 2>&1 || true
+            yes | "$SDKMANAGER" --sdk_root="${SDK_ROOT}" --install \
+              "platform-tools" \
+              "platforms;android-36.1" \
+              "build-tools;36.0.0" || true
+            yes | "$SDKMANAGER" --sdk_root="${SDK_ROOT}" --licenses >/dev/null 2>&1 || true
           fi
 
-          echo "Using sdkmanager: ${SDKMANAGER}"
-          set +o pipefail
-          yes | "$SDKMANAGER" --sdk_root="${SDK_ROOT}" --licenses >/dev/null 2>&1 || true
-          yes | "$SDKMANAGER" --sdk_root="${SDK_ROOT}" --install \
-            "platform-tools" \
-            "platforms;android-36.1" \
-            "platforms;android-36" \
-            "build-tools;36.0.0"
-          yes | "$SDKMANAGER" --sdk_root="${SDK_ROOT}" --licenses >/dev/null 2>&1 || true
-
-      - name: Restore project signing keystore
-        id: keystore
+      - name: Restore Firebase config & signing keystore
+        id: secrets_restore
         env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
         run: |
           set -e
-          KEYSTORE_SOURCE="existing"
-          if [ ! -f debug.keystore ]; then
-            if [ -f debug.keystore.base64 ] && [ -s debug.keystore.base64 ]; then
-              tr -d '\r\n' < debug.keystore.base64 | base64 -d > debug.keystore
-              KEYSTORE_SOURCE="project_base64"
-            elif [ -n "${DEBUG_KEYSTORE_BASE64:-}" ]; then
-              printf '%s' "${DEBUG_KEYSTORE_BASE64}" | tr -d '\r\n' | base64 -d > debug.keystore
-              KEYSTORE_SOURCE="github_secret"
-            else
-              echo "::warning::debug.keystore.base64 was not found in repository. Generating a fallback debug keystore."
-              keytool -genkeypair -v \
-                -keystore debug.keystore \
-                -storepass android \
-                -alias androiddebugkey \
-                -keypass android \
-                -keyalg RSA \
-                -keysize 2048 \
-                -validity 10000 \
-                -dname "CN=Android Debug,O=Android,C=US"
-              KEYSTORE_SOURCE="generated_fallback"
+          MISSING=""
+
+          # 1. Restore app/google-services.json
+          if [ ! -s app/google-services.json ]; then
+            if [ -n "${GOOGLE_SERVICES_JSON:-}" ]; then
+              FIRST_CHAR="$(printf '%s' "${GOOGLE_SERVICES_JSON}" | tr -d '[:space:]' | cut -c1)"
+              if [ "$FIRST_CHAR" = "{" ]; then
+                printf '%s\n' "${GOOGLE_SERVICES_JSON}" > app/google-services.json
+              else
+                printf '%s' "${GOOGLE_SERVICES_JSON}" | tr -d '[:space:]' | base64 -d > app/google-services.json
+              fi
             fi
           fi
-          keytool -list -keystore debug.keystore -storepass android >/dev/null
+
+          if [ ! -s app/google-services.json ]; then
+            MISSING="${MISSING}\n- \`GOOGLE_SERVICES_JSON\` (copy contents of \`app/google-services.json\`)"
+          else
+            python3 -m json.tool app/google-services.json >/dev/null
+          fi
+
+          # 2. Restore debug.keystore
+          KEYSTORE_SOURCE="existing"
+          if [ ! -s debug.keystore ]; then
+            if [ -s debug.keystore.base64 ]; then
+              tr -d '[:space:]' < debug.keystore.base64 | base64 -d > debug.keystore
+              KEYSTORE_SOURCE="project_base64"
+            elif [ -n "${DEBUG_KEYSTORE_BASE64:-}" ]; then
+              printf '%s' "${DEBUG_KEYSTORE_BASE64}" | tr -d '[:space:]' | base64 -d > debug.keystore
+              KEYSTORE_SOURCE="github_secret"
+            fi
+          fi
+
+          if [ ! -s debug.keystore ]; then
+            MISSING="${MISSING}\n- \`DEBUG_KEYSTORE_BASE64\` (copy contents of \`debug.keystore.base64\`)"
+          else
+            keytool -list -keystore debug.keystore -storepass android >/dev/null
+          fi
+
+          if [ -n "$MISSING" ]; then
+            {
+              echo "## Missing GitHub Actions Secrets"
+              echo ""
+              echo "AI Studio excludes sensitive Firebase and keystore files when pushing to GitHub."
+              echo "Add the following Repository Secrets under **Settings -> Secrets and variables -> Actions -> New repository secret**, then re-run this workflow:"
+              echo -e "${MISSING}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Missing required GitHub Secrets. See Job Summary for exact setup instructions."
+            exit 1
+          fi
+
           echo "keystore_source=${KEYSTORE_SOURCE}" >> "$GITHUB_OUTPUT"
 
+          # 3. Ensure .env exists for Secrets Gradle Plugin
           if [ ! -f .env ]; then
             if [ -f .env.example ]; then
               cp .env.example .env
@@ -125,18 +150,16 @@ jobs:
       - name: Write failure diagnostics to Job Summary
         if: failure()
         run: |
-          {
-            echo "## Build Failed Diagnostics"
-            echo ""
-            if [ -f gradle-build.log ]; then
+          if [ -f gradle-build.log ]; then
+            {
+              echo "## Build Failed Diagnostics"
+              echo ""
               echo "Last 80 lines of Gradle build output:"
               echo '```text'
               tail -n 80 gradle-build.log
               echo '```'
-            else
-              echo "Gradle build log was not generated (failure occurred before Gradle ran)."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Prepare versioned APK file
         run: |
@@ -176,7 +199,7 @@ jobs:
             echo ""
             echo "- **Version Code:** \`${{ steps.app_version.outputs.version_code }}\`"
             echo "- **Version Name:** \`${{ steps.app_version.outputs.version_name }}\`"
-            echo "- **Signing Key Source:** \`${{ steps.keystore.outputs.keystore_source }}\`"
+            echo "- **Signing Key Source:** \`${{ steps.secrets_restore.outputs.keystore_source }}\`"
             echo "- **Direct APK Download URL (paste into Super Admin Updater):**"
             echo ""
             echo "\`\`\`"
