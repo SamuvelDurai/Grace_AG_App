@@ -394,38 +394,25 @@ fun NotificationCenterDialog(
           )
         }
 
-        OutlinedButton(
-          onClick = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-              !NotificationHelper.hasNotificationPermission(context)
-            ) {
+        if (!hasPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+          OutlinedButton(
+            onClick = {
               notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-              val sent = NotificationHelper.showDailyVerseReminderNow(context)
-              Toast.makeText(
-                context,
-                if (sent) "Sample Daily Verse notification sent" else "Enable system notifications for GRACE AG",
-                Toast.LENGTH_SHORT
-              ).show()
-            }
-          },
-          shape = RoundedCornerShape(10.dp),
-          border = BorderStroke(1.dp, SoftBlueBorder),
-          modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .testTag("notif_center_test_button")
-        ) {
-          Text(
-            text = if (!hasPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-              "Allow Notifications"
-            } else {
-              "Send Sample Verse Alert"
             },
-            color = ClassicChurchBlue,
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.labelMedium
-          )
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, SoftBlueBorder),
+            modifier = Modifier
+              .fillMaxWidth()
+              .heightIn(min = 48.dp)
+              .testTag("notif_center_permission_button")
+          ) {
+            Text(
+              text = "Allow Notifications",
+              color = ClassicChurchBlue,
+              fontWeight = FontWeight.Bold,
+              style = MaterialTheme.typography.labelMedium
+            )
+          }
         }
       }
     },

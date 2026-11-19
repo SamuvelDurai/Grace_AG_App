@@ -161,10 +161,11 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Prepare versioned APK file
+      - name: Prepare versioned and permanent latest APK files
         run: |
           mkdir -p release-apk
           cp app/build/outputs/apk/debug/app-debug.apk "release-apk/${{ steps.app_version.outputs.apk_name }}"
+          cp app/build/outputs/apk/debug/app-debug.apk "release-apk/grace-ag-latest.apk"
 
       - name: Upload APK build artifact
         uses: actions/upload-artifact@v6
@@ -179,30 +180,38 @@ jobs:
         run: |
           TAG="v${{ steps.app_version.outputs.version_name }}"
           APK_FILE="release-apk/${{ steps.app_version.outputs.apk_name }}"
+          LATEST_APK_FILE="release-apk/grace-ag-latest.apk"
           TITLE="GRACE AG v${{ steps.app_version.outputs.version_name }} (Build ${{ steps.app_version.outputs.version_code }})"
           NOTES="Automated Android APK build for GRACE AG v${{ steps.app_version.outputs.version_name }} (Version Code: ${{ steps.app_version.outputs.version_code }})."
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK_FILE" --clobber
-            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
+            gh release upload "$TAG" "$APK_FILE" "$LATEST_APK_FILE" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --latest
           else
-            gh release create "$TAG" "$APK_FILE" --title "$TITLE" --notes "$NOTES"
+            gh release create "$TAG" "$APK_FILE" "$LATEST_APK_FILE" --title "$TITLE" --notes "$NOTES" --latest
           fi
 
       - name: Write direct download link to Job Summary
         run: |
           TAG="v${{ steps.app_version.outputs.version_name }}"
           APK_NAME="${{ steps.app_version.outputs.apk_name }}"
-          DIRECT_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${APK_NAME}"
+          VERSIONED_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${APK_NAME}"
+          PERMANENT_URL="https://github.com/${{ github.repository }}/releases/latest/download/grace-ag-latest.apk"
           {
             echo "## GRACE AG APK Ready!"
             echo ""
             echo "- **Version Code:** \`${{ steps.app_version.outputs.version_code }}\`"
             echo "- **Version Name:** \`${{ steps.app_version.outputs.version_name }}\`"
             echo "- **Signing Key Source:** \`${{ steps.secrets_restore.outputs.keystore_source }}\`"
-            echo "- **Direct APK Download URL (paste into Super Admin Updater):**"
+            echo "- **Permanent Always-Latest APK URL (paste once in Super Admin Updater — never needs changing):**"
             echo ""
             echo "\`\`\`"
-            echo "${DIRECT_URL}"
+            echo "${PERMANENT_URL}"
+            echo "\`\`\`"
+            echo ""
+            echo "- **Versioned APK URL (this release only):**"
+            echo ""
+            echo "\`\`\`"
+            echo "${VERSIONED_URL}"
             echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"
