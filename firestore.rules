@@ -1,0 +1,517 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isPastorOrAdmin(churchId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().churchId == churchId &&
+        (getUserData().role == 'PASTOR' || getUserData().role == 'SUPER_ADMIN') &&
+        getUserData().accountStatus == 'APPROVED';
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().role == 'SUPER_ADMIN' &&
+        getUserData().accountStatus == 'APPROVED';
+    }
+
+    function isBootstrapOwnerEmail() {
+      return isAuthenticated() &&
+        'email' in request.auth.token &&
+        request.auth.token.email is string &&
+        request.auth.token.email.lower() == 'samuveldurai6@gmail.com';
+    }
+
+    function hasMatchingPastorInvite() {
+      return isAuthenticated() && (
+        ('email' in request.auth.token &&
+         request.auth.token.email is string &&
+         exists(/databases/$(database)/documents/pastorInvites/$(('email_' + request.auth.token.email.lower())))) ||
+        ('phone_number' in request.auth.token &&
+         request.auth.token.phone_number is string &&
+         exists(/databases/$(database)/documents/pastorInvites/$(('phone_' + request.auth.token.phone_number))))
+      );
+    }
+
+    function isChurchAdminUnclaimed(churchId) {
+      return !exists(/databases/$(database)/documents/churches/$(churchId)) ||
+        !('adminUid' in get(/databases/$(database)/documents/churches/$(churchId)).data) ||
+        get(/databases/$(database)/documents/churches/$(churchId)).data.adminUid == '';
+    }
+
+    function isValidPrayerRequest(data) {
+      return data.uid is string && data.uid.size() > 0 &&
+        data.churchId is string && data.churchId.size() > 0 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        data.description is string && data.description.size() <= 2000 &&
+        data.privacy in ['PASTOR_ONLY', 'PRAYER_INTERCESSORS', 'CHURCH_FAMILY'] &&
+        data.status in ['NEW', 'IN_REVIEW', 'PRAYED_FOR', 'CLOSED'];
+    }
+
+    function isValidOffering(data) {
+      return data.uid is string && data.uid.size() > 0 &&
+        data.churchId is string && data.churchId.size() > 0 &&
+        data.amount is number && data.amount > 0 && data.amount <= 10000000 &&
+        data.category in ['TITHE', 'GENERAL_OFFERING', 'MISSIONARY_SUPPORT', 'BUILDING_FUND', 'CHARITY_WELFARE', 'SPECIAL_THANKSGIVING'] &&
+        data.status in ['PENDING', 'SUCCESS', 'FAILED'] &&
+        data.receiptNumber is string && data.receiptNumber.size() > 0;
+    }
+
+    function isValidSubscription(data) {
+      return data.uid is string && data.uid.size() > 0 &&
+        data.churchId is string && data.churchId.size() > 0 &&
+        data.amountDue is number && data.amountDue >= 0 &&
+        data.status in ['PAID', 'PENDING', 'PENDING_VERIFICATION', 'OVERDUE', 'WAIVED'] &&
+        (!('familyId' in data) || data.familyId is string);
+    }
+
+    function isSubscriptionFamilyOwner(subData) {
+      return isAuthenticated() && (
+        subData.uid == request.auth.uid ||
+        ('familyId' in subData &&
+         subData.familyId is string &&
+         subData.familyId.size() > 0 &&
+         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         'familyId' in getUserData() &&
+         getUserData().familyId is string &&
+         getUserData().familyId == subData.familyId)
+      );
+    }
+
+    function isValidEvent(data) {
+      return data.eventId is string && data.eventId.size() > 0 &&
+        data.churchId is string && data.churchId.size() > 0 &&
+        data.titleEnglish is string && data.titleEnglish.size() > 0 && data.titleEnglish.size() <= 200 &&
+        data.eventDate is string && data.eventDate.size() > 0 &&
+        (!('capacity' in data) || (data.capacity is int && data.capacity > 0 && data.capacity <= 10000)) &&
+        (!('registeredCount' in data) || (data.registeredCount is int && data.registeredCount >= 0 && data.registeredCount <= 10000)) &&
+        (!('attendeeIds' in data) || (data.attendeeIds is list && data.attendeeIds.size() <= 1000)) &&
+        (!('category' in data) || data.category in [
+          'SUNDAY_SERVICE',
+          'FASTING_PRAYER',
+          'YOUTH_EVENT',
+          'OUTREACH_MISSION',
+          'SPECIAL_FESTIVAL',
+          'OTHER_EVENT'
+        ]);
+    }
+
+    function isValidSermon(data) {
+      return data.churchId is string && data.churchId.size() > 0 &&
+        data.titleEnglish is string && data.titleEnglish.size() > 0 && data.titleEnglish.size() <= 200 &&
+        data.speakerName is string && data.speakerName.size() > 0;
+    }
+
+    function isValidFellowshipGroup(data) {
+      return data.groupId is string && data.groupId.size() > 0 &&
+        data.churchId is string && data.churchId.size() > 0 &&
+        data.nameEnglish is string && data.nameEnglish.size() > 0 && data.nameEnglish.size() <= 150 &&
+        data.leaderName is string && data.leaderName.size() > 0 && data.leaderName.size() <= 120 &&
+        data.memberCount is int && data.memberCount >= 0 && data.memberCount <= 5000 &&
+        data.memberIds is list && data.memberIds.size() <= 500 &&
+        data.category in [
+          'AREA_CARE_CELL',
+          'YOUTH_MINISTRY',
+          'SUNDAY_SCHOOL',
+          'WOMENS_FELLOWSHIP',
+          'MENS_FELLOWSHIP',
+          'CHOIR_WORSHIP',
+          'OTHER_GROUP'
+        ];
+    }
+
+    function isValidPastoralCareAlert(data) {
+      return data.alertId is string && data.alertId.size() > 0 &&
+        data.churchId is string && data.churchId.size() > 0 &&
+        data.memberUid is string && data.memberUid.size() > 0 &&
+        data.memberName is string && data.memberName.size() > 0 &&
+        data.careType in ['BIRTHDAY', 'WEDDING_ANNIVERSARY', 'HOSPITAL_VISIT', 'HOME_BLESSING', 'BEREAVEMENT_CARE'] &&
+        data.status in ['PENDING', 'CALLED', 'VISITED', 'PRAYED'];
+    }
+
+    function isValidChurchConfig(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+        data.defaultLanguage in ['en', 'ta'] &&
+        (!('monthlyDuesAmount' in data) || (data.monthlyDuesAmount is number && data.monthlyDuesAmount >= 0 && data.monthlyDuesAmount <= 1000000)) &&
+        (!('latestVersionCode' in data) || (data.latestVersionCode is int && data.latestVersionCode >= 1 && data.latestVersionCode <= 1000000)) &&
+        (!('latestVersionName' in data) || (data.latestVersionName is string && data.latestVersionName.size() <= 40)) &&
+        (!('updateDownloadUrl' in data) || (data.updateDownloadUrl is string && data.updateDownloadUrl.size() <= 500)) &&
+        (!('updateReleaseNotes' in data) || (data.updateReleaseNotes is string && data.updateReleaseNotes.size() <= 1000)) &&
+        (!('forceUpdate' in data) || data.forceUpdate is bool);
+    }
+
+    function isValidBibleVerse(data) {
+      return data.churchId is string && data.churchId.size() > 0 &&
+        data.bookReference is string && data.bookReference.size() > 0 && data.bookReference.size() <= 150 &&
+        (!('textEnglish' in data) || (data.textEnglish is string && data.textEnglish.size() <= 2000)) &&
+        (!('textTamil' in data) || (data.textTamil is string && data.textTamil.size() <= 2000)) &&
+        (!('devotionalEnglish' in data) || (data.devotionalEnglish is string && data.devotionalEnglish.size() <= 2000)) &&
+        (!('devotionalTamil' in data) || (data.devotionalTamil is string && data.devotionalTamil.size() <= 2000)) &&
+        (!('pinDateKey' in data) || (data.pinDateKey is string && data.pinDateKey.size() <= 32));
+    }
+
+    function isValidDailyVerseConfig(data, churchId) {
+      return data.churchId == churchId &&
+        data.autoDailyEnabled is bool &&
+        (!('rotationHour' in data) || (data.rotationHour is int && data.rotationHour >= 0 && data.rotationHour <= 23)) &&
+        (!('updatedByName' in data) || (data.updatedByName is string && data.updatedByName.size() <= 150)) &&
+        (!('updatedByUid' in data) || (data.updatedByUid is string && data.updatedByUid == request.auth.uid));
+    }
+
+    function isValidAuditLog(data) {
+      return data.churchId is string && data.churchId.size() > 0 &&
+        data.action is string && data.action.size() > 0 && data.action.size() <= 500 &&
+        data.actorUid == request.auth.uid;
+    }
+
+    function isValidFamily(data) {
+      return data.familyId is string && data.familyId.size() > 0 &&
+        data.churchId is string && data.churchId.size() > 0 &&
+        data.headUid is string &&
+        data.dependentMembers is list && data.dependentMembers.size() <= 50 &&
+        data.linkedMemberUids is list && data.linkedMemberUids.size() <= 30 &&
+        data.sharedSubscriptionStatus in ['PAID', 'PENDING', 'PENDING_VERIFICATION', 'OVERDUE', 'WAIVED'];
+    }
+
+    function isFamilyMemberOrHead(famData) {
+      return isAuthenticated() && (
+        famData.headUid == request.auth.uid ||
+        request.auth.uid in famData.linkedMemberUids ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         'familyId' in getUserData() &&
+         getUserData().familyId is string &&
+         getUserData().familyId == famData.familyId)
+      );
+    }
+
+    // Churches collection
+    match /churches/{churchId} {
+      allow read: if true;
+      allow create, update: if isSuperAdmin() && isValidChurchConfig(request.resource.data);
+      allow delete: if isSuperAdmin();
+
+      // Atomic sequential counters for GRACE AG IDs & receipt numbers
+      match /counters/{counterKey} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+                         request.resource.data.lastNumber is int &&
+                         request.resource.data.lastNumber == 1 &&
+                         (!counterKey.matches('^(receipt_|pastor).*') || isPastorOrAdmin(churchId));
+        allow update: if isAuthenticated() &&
+                         request.resource.data.lastNumber is int &&
+                         resource.data.lastNumber is int &&
+                         request.resource.data.lastNumber == resource.data.lastNumber + 1 &&
+                         (!counterKey.matches('^(receipt_|pastor).*') || isPastorOrAdmin(churchId));
+        allow delete: if isSuperAdmin();
+      }
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) ||
+        (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         (getUserData().role == 'PASTOR' || getUserData().role == 'SUPER_ADMIN'));
+
+      // New users can create their own profile as BELIEVER/PENDING, claim matching Pastor invite, or claim initial SUPER_ADMIN;
+      // Super Admin can directly create Pastor or Believer accounts for their church.
+      allow create: if (
+        isOwner(userId) &&
+        request.resource.data.uid == userId &&
+        (!('familyId' in request.resource.data) || request.resource.data.familyId in ['', 'fam_' + userId]) &&
+        (
+          (request.resource.data.role == 'BELIEVER' && request.resource.data.accountStatus == 'PENDING') ||
+          (request.resource.data.role == 'PASTOR' &&
+           request.resource.data.accountStatus == 'APPROVED' &&
+           hasMatchingPastorInvite()) ||
+          (request.resource.data.role == 'SUPER_ADMIN' &&
+           request.resource.data.accountStatus == 'APPROVED' &&
+           (isBootstrapOwnerEmail() || isChurchAdminUnclaimed(request.resource.data.churchId)))
+        )
+      ) || (
+        isSuperAdmin() &&
+        request.resource.data.uid == userId &&
+        request.resource.data.churchId == getUserData().churchId &&
+        request.resource.data.role in ['PASTOR', 'BELIEVER'] &&
+        request.resource.data.accountStatus in ['APPROVED', 'PENDING']
+      );
+
+      // Users can update their own non-role fields; bootstrap owner can claim SUPER_ADMIN; Pastor invite holder claims PASTOR;
+      // Believers linked into a Family document can adopt that familyId on /users/{uid};
+      // Pastor/Admin manage member approvals, roles, and shared family links.
+      allow update: if (isOwner(userId) &&
+                        request.resource.data.role == resource.data.role &&
+                        request.resource.data.accountStatus == resource.data.accountStatus &&
+                        (!('photoUrl' in request.resource.data) ||
+                         request.resource.data.photoUrl == null ||
+                         (request.resource.data.photoUrl is string &&
+                          request.resource.data.photoUrl.size() <= 200000)) &&
+                        (!('fcmToken' in request.resource.data) ||
+                         request.resource.data.fcmToken == null ||
+                         (request.resource.data.fcmToken is string &&
+                          request.resource.data.fcmToken.size() <= 512)) &&
+                        (!('familyId' in request.resource.data) ||
+                         request.resource.data.familyId == '' ||
+                         request.resource.data.familyId == 'fam_' + userId ||
+                         ('familyId' in resource.data && request.resource.data.familyId == resource.data.familyId) ||
+                         (request.resource.data.familyId is string &&
+                          request.resource.data.familyId.size() > 0 &&
+                          exists(/databases/$(database)/documents/families/$(request.resource.data.familyId)) &&
+                          request.auth.uid in get(/databases/$(database)/documents/families/$(request.resource.data.familyId)).data.linkedMemberUids))) ||
+                       (isOwner(userId) &&
+                        isBootstrapOwnerEmail() &&
+                        request.resource.data.role == 'SUPER_ADMIN' &&
+                        request.resource.data.accountStatus == 'APPROVED') ||
+                       (isOwner(userId) &&
+                        hasMatchingPastorInvite() &&
+                        request.resource.data.role == 'PASTOR' &&
+                        request.resource.data.accountStatus == 'APPROVED') ||
+                       isPastorOrAdmin(resource.data.churchId);
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // Pre-provisioned Pastor invites created by Super Admin
+    match /pastorInvites/{inviteId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        ('email' in request.auth.token &&
+         request.auth.token.email is string &&
+         resource.data.emailLower == request.auth.token.email.lower()) ||
+        ('phone_number' in request.auth.token &&
+         request.auth.token.phone_number is string &&
+         resource.data.phoneNormalized == request.auth.token.phone_number)
+      );
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // Believers collection
+    match /believers/{memberId} {
+      allow get: if (resource == null && isAuthenticated()) ||
+                    (isAuthenticated() && resource.data.uid == request.auth.uid) ||
+                    isPastorOrAdmin(resource.data.churchId);
+      allow list: if (isAuthenticated() && resource.data.uid == request.auth.uid) ||
+                     isPastorOrAdmin(resource.data.churchId);
+      allow create: if ((isAuthenticated() && request.resource.data.uid == request.auth.uid) ||
+                        isPastorOrAdmin(request.resource.data.churchId)) &&
+                       (!('profilePhotoUrl' in request.resource.data) ||
+                        request.resource.data.profilePhotoUrl == null ||
+                        (request.resource.data.profilePhotoUrl is string &&
+                         request.resource.data.profilePhotoUrl.size() <= 200000));
+      allow update: if ((isAuthenticated() && resource.data.uid == request.auth.uid && request.resource.data.uid == resource.data.uid) ||
+                        isPastorOrAdmin(resource.data.churchId)) &&
+                       (!('profilePhotoUrl' in request.resource.data) ||
+                        request.resource.data.profilePhotoUrl == null ||
+                        (request.resource.data.profilePhotoUrl is string &&
+                         request.resource.data.profilePhotoUrl.size() <= 200000));
+      allow delete: if isSuperAdmin();
+    }
+
+    // Exact-match believer lookup index (id_<MEMBERSHIP_ID>, phone_<10_DIGITS>) so family heads
+    // can connect relatives cleanly without listing or scraping other members.
+    match /memberLookup/{lookupId} {
+      allow get: if isAuthenticated();
+      allow list: if isPastorOrAdmin(resource.data.churchId);
+      allow create, update: if isAuthenticated() &&
+                               request.resource.data.uid is string &&
+                               request.resource.data.churchId is string &&
+                               (request.resource.data.uid == request.auth.uid ||
+                                isPastorOrAdmin(request.resource.data.churchId)) &&
+                               (!('profilePhotoUrl' in request.resource.data) ||
+                                request.resource.data.profilePhotoUrl == null ||
+                                (request.resource.data.profilePhotoUrl is string &&
+                                 request.resource.data.profilePhotoUrl.size() <= 200000));
+      allow delete: if isSuperAdmin() || isPastorOrAdmin(resource.data.churchId);
+    }
+
+    // Families collection (household head, dependent members, shared subscription status)
+    match /families/{familyId} {
+      allow get: if (resource == null && isAuthenticated()) ||
+                    isFamilyMemberOrHead(resource.data) ||
+                    isPastorOrAdmin(resource.data.churchId);
+      allow list: if isFamilyMemberOrHead(resource.data) ||
+                     isPastorOrAdmin(resource.data.churchId);
+      allow create: if (
+                         isPastorOrAdmin(request.resource.data.churchId) ||
+                         (isAuthenticated() &&
+                          request.resource.data.headUid == request.auth.uid &&
+                          request.resource.data.sharedSubscriptionStatus in ['PENDING', 'PENDING_VERIFICATION'] &&
+                          (request.resource.data.familyId == 'fam_' + request.auth.uid ||
+                           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                            'familyId' in getUserData() &&
+                            getUserData().familyId == request.resource.data.familyId)))
+                       ) && isValidFamily(request.resource.data);
+      allow update: if (
+                         isPastorOrAdmin(request.resource.data.churchId) ||
+                         (isFamilyMemberOrHead(resource.data) &&
+                          request.resource.data.familyId == resource.data.familyId &&
+                          request.resource.data.churchId == resource.data.churchId &&
+                          (request.resource.data.headUid == resource.data.headUid ||
+                           (resource.data.headUid == request.auth.uid &&
+                            request.resource.data.headUid in request.resource.data.linkedMemberUids)) &&
+                          (request.resource.data.sharedSubscriptionStatus in ['PENDING', 'PENDING_VERIFICATION'] ||
+                           request.resource.data.sharedSubscriptionStatus == resource.data.sharedSubscriptionStatus))
+                       ) && isValidFamily(request.resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Membership applications
+    match /membershipApplications/{applicationId} {
+      allow read: if (isAuthenticated() && resource.data.uid == request.auth.uid) ||
+                     isPastorOrAdmin(resource.data.churchId);
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow update: if isPastorOrAdmin(resource.data.churchId) ||
+                       (isOwner(resource.data.uid) && resource.data.status == 'PENDING');
+      allow delete: if isSuperAdmin();
+    }
+
+    // Announcements
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isPastorOrAdmin(request.resource.data.churchId);
+      allow delete: if isPastorOrAdmin(resource.data.churchId);
+    }
+
+    // Bible verses
+    match /bibleVerses/{verseId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isPastorOrAdmin(request.resource.data.churchId) &&
+                               isValidBibleVerse(request.resource.data);
+      allow delete: if isPastorOrAdmin(resource.data.churchId);
+    }
+
+    // Daily Verse Automation Config (managed by Pastor or Super Admin)
+    match /dailyVerseConfig/{churchId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isPastorOrAdmin(churchId) &&
+                               isValidDailyVerseConfig(request.resource.data, churchId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Prayer Requests
+    match /prayerRequests/{requestId} {
+      allow read: if (isAuthenticated() && resource.data.uid == request.auth.uid) ||
+                     isPastorOrAdmin(resource.data.churchId);
+      allow create: if isAuthenticated() &&
+                       request.resource.data.uid == request.auth.uid &&
+                       isValidPrayerRequest(request.resource.data);
+      allow update: if (isOwner(resource.data.uid) || isPastorOrAdmin(resource.data.churchId)) &&
+                       isValidPrayerRequest(request.resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Voluntary Offerings (believers submit PENDING; Pastor/Admin verifies SUCCESS/FAILED)
+    match /offerings/{transactionId} {
+      allow read: if isOwner(resource.data.uid) || isPastorOrAdmin(resource.data.churchId);
+      allow create: if (
+                         isPastorOrAdmin(request.resource.data.churchId) ||
+                         (isAuthenticated() &&
+                          request.resource.data.uid == request.auth.uid &&
+                          request.resource.data.status == 'PENDING')
+                       ) && isValidOffering(request.resource.data);
+      allow update: if isPastorOrAdmin(resource.data.churchId) &&
+                       isPastorOrAdmin(request.resource.data.churchId) &&
+                       isValidOffering(request.resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Monthly Subscriptions (1 subscription per church family; Pastor/Admin verifies PAID)
+    match /subscriptions/{subscriptionId} {
+      allow get: if (resource == null && isAuthenticated()) ||
+                    isSubscriptionFamilyOwner(resource.data) ||
+                    isPastorOrAdmin(resource.data.churchId);
+      allow list: if isSubscriptionFamilyOwner(resource.data) ||
+                     isPastorOrAdmin(resource.data.churchId);
+      allow create: if (
+                         isPastorOrAdmin(request.resource.data.churchId) ||
+                         (isAuthenticated() &&
+                          request.resource.data.uid == request.auth.uid &&
+                          isSubscriptionFamilyOwner(request.resource.data) &&
+                          request.resource.data.status in ['PENDING', 'PENDING_VERIFICATION'] &&
+                          (!('amountPaid' in request.resource.data) || request.resource.data.amountPaid == 0))
+                       ) && isValidSubscription(request.resource.data);
+      allow update: if (
+                         isPastorOrAdmin(request.resource.data.churchId) ||
+                         (isSubscriptionFamilyOwner(resource.data) &&
+                          request.resource.data.uid == resource.data.uid &&
+                          request.resource.data.churchId == resource.data.churchId &&
+                          (!('familyId' in resource.data) || request.resource.data.familyId == resource.data.familyId) &&
+                          request.resource.data.status in ['PENDING', 'PENDING_VERIFICATION'] &&
+                          (!('amountPaid' in request.resource.data) || request.resource.data.amountPaid == 0))
+                       ) && isValidSubscription(request.resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Church Events
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isPastorOrAdmin(request.resource.data.churchId) &&
+                       isValidEvent(request.resource.data);
+      allow update: if (isPastorOrAdmin(request.resource.data.churchId) &&
+                        isPastorOrAdmin(resource.data.churchId) &&
+                        isValidEvent(request.resource.data)) ||
+                       (isAuthenticated() &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendeeIds', 'registeredCount', 'updatedAt']) &&
+                        (
+                          (request.resource.data.attendeeIds.hasAll(resource.data.attendeeIds) &&
+                           request.resource.data.attendeeIds.removeAll(resource.data.attendeeIds).hasOnly([request.auth.uid])) ||
+                          (resource.data.attendeeIds.hasAll(request.resource.data.attendeeIds) &&
+                           resource.data.attendeeIds.removeAll(request.resource.data.attendeeIds).hasOnly([request.auth.uid]))
+                        ) &&
+                        isValidEvent(request.resource.data));
+      allow delete: if isPastorOrAdmin(resource.data.churchId);
+    }
+
+    // Sermons
+    match /sermons/{sermonId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isPastorOrAdmin(request.resource.data.churchId) &&
+                               isValidSermon(request.resource.data);
+      allow delete: if isPastorOrAdmin(resource.data.churchId);
+    }
+
+    // Fellowship Groups & Care Cells
+    match /fellowshipGroups/{groupId} {
+      allow read: if isAuthenticated();
+      allow create: if isPastorOrAdmin(request.resource.data.churchId) &&
+                       isValidFellowshipGroup(request.resource.data);
+      allow update: if isPastorOrAdmin(request.resource.data.churchId) &&
+                       isPastorOrAdmin(resource.data.churchId) &&
+                       isValidFellowshipGroup(request.resource.data);
+      allow delete: if isPastorOrAdmin(resource.data.churchId);
+    }
+
+    // Pastoral Care Alerts & Visit Requests
+    match /pastoralCareAlerts/{alertId} {
+      allow read: if (isAuthenticated() && resource.data.memberUid == request.auth.uid) ||
+                     isPastorOrAdmin(resource.data.churchId);
+      allow create: if isAuthenticated() &&
+                       (request.resource.data.memberUid == request.auth.uid || isPastorOrAdmin(request.resource.data.churchId)) &&
+                       isValidPastoralCareAlert(request.resource.data);
+      allow update: if isPastorOrAdmin(resource.data.churchId) &&
+                       isPastorOrAdmin(request.resource.data.churchId) &&
+                       isValidPastoralCareAlert(request.resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Audit logs
+    match /auditLogs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isAuthenticated() && isValidAuditLog(request.resource.data);
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,918 @@
+CHURCH CONNECT COMPLETE ANDROID APP DEVELOPMENT SPECIFICATION Version:
+1.0 Purpose: Master project brief to provide to Google AI Studio
+
+============================================================ 1. PROJECT
+OVERVIEW ============================================================
+
+Build a production-minded native Android application named “Church
+Connect”.
+
+Tagline: “Growing in Faith. Connected as One Family.”
+
+Church Connect is a bilingual church management and believer engagement
+platform. It connects church members (believers), pastors, and super
+administrators through one Android application with role-based
+dashboards and permissions.
+
+The app must be designed for Android Studio development. Use native
+Android technologies: - Kotlin - Jetpack Compose for UI - Material 3 -
+Navigation Compose - MVVM architecture - Kotlin Coroutines and Flow -
+Repository pattern - Hilt for dependency injection (if supported by the
+project setup) - Firebase Authentication - Cloud Firestore - Firebase
+Storage - Firebase Cloud Functions for trusted server-side operations -
+Firebase Cloud Messaging for push notifications - Firebase Crashlytics
+and Analytics, with appropriate consent and privacy controls
+
+Do not build a web app or Flutter app. This is a native Android Studio
+project.
+
+Initial launch is for one church. However, design the data model with a
+churchId field and tenant-aware repositories/security rules so that
+multiple churches can be supported in a future release without
+rebuilding the whole system.
+
+The app must support: - Tamil (ta) - English (en) - User-selectable
+language - Language persistence between sessions - All user-facing text
+through Android string resources; do not hardcode UI text in
+composables. - Proper Tamil font rendering and layouts.
+
+IMPORTANT IMPLEMENTATION APPROACH: Build the application in small,
+compilable phases. Do not generate the entire project as one huge code
+response. First create the project architecture and foundational
+screens, then implement each feature module. Keep the app runnable after
+every phase. Provide complete file paths and complete file contents for
+every new or modified file. Do not use pseudocode, TODO placeholders for
+core functionality, fake payment success, or buttons that do nothing. If
+an external service requires credentials, clearly mark the configuration
+step and provide a safe test-mode implementation.
+
+============================================================ 2. USER
+ROLES AND ACCESS CONTROL
+============================================================
+
+There are three roles:
+
+A. BELIEVER - Can register or sign in. - Can submit a church membership
+application. - Can edit permitted personal profile fields. - Can view
+their own membership details and membership card. - Can view daily Bible
+verses, announcements, sermons, events and church content. - Can submit
+private prayer requests. - Can request pastoral counselling
+appointments. - Can view their own subscription dues, payments,
+offerings and receipts. - Can view their own attendance history if the
+church enables this feature. - Can submit testimonies for pastor
+approval. - Cannot view other believers’ private profiles, payment
+details, prayer requests or counselling records. - Cannot approve their
+own membership or change their role.
+
+B. PASTOR - Can sign in only after a Super Admin has created or approved
+the pastor account. - Can manage believers belonging to the assigned
+church. - Can review and approve/reject membership applications. - Can
+create and publish announcements in Tamil and English. - Can publish
+daily Bible verses and devotionals. - Can manage events, sermons,
+attendance, baptism records and ministry groups. - Can view and respond
+to prayer requests according to privacy settings. - Can manage
+counselling appointments. - Can review and approve testimonies. - Can
+view subscription and offering reports only if the Super Admin grants
+finance permission. - Cannot create or promote another Super Admin. -
+Cannot access data belonging to another church. - Important actions must
+be recorded in audit logs.
+
+C. SUPER ADMIN - Highest application-level authority. - Can create,
+approve, suspend and manage pastor accounts. - Can manage believers and
+membership records. - Can configure church name, logo, address, contact
+details, service timings and settings. - Can configure subscription
+amounts, due dates and payment options. - Can manage permissions for
+pastors and authorized staff. - Can manage content, notifications,
+reports and system settings. - Can access financial reports and
+reconcile transactions. - Can view audit logs. - Can manage account
+status and data export requests. - Can configure the app’s
+church-specific content. - Must be protected from public
+self-registration. Initial Super Admin must be provisioned securely by
+the developer using Firebase Admin SDK or a trusted server-side process.
+
+SECURITY RULE: Never trust a role value supplied by the Android client.
+Store role and church assignment in protected Firestore documents and/or
+Firebase custom claims. Only trusted server-side code may grant or
+change privileged roles. Firestore and Storage Security Rules must
+enforce access independently of the UI.
+
+Use least-privilege permissions. A pastor’s permissions should be
+configurable, especially for financial records, counselling and
+sensitive member information.
+
+============================================================ 3.
+AUTHENTICATION AND ONBOARDING
+============================================================
+
+Create the following screens: 1. Splash screen with Church Connect logo.
+2. Welcome/onboarding screen. 3. Language selection: தமிழ் / English. 4.
+Sign-in screen using phone number and Firebase Phone Authentication OTP.
+5. OTP verification screen. 6. New believer registration form. 7.
+Membership application submitted screen. 8. Pending approval screen. 9.
+Account suspended/disabled screen. 10. Role-based dashboard routing.
+
+Registration fields: - Full name - Phone number (verified through OTP) -
+Email (optional) - Date of birth (optional) - Gender (optional; only
+collect if church needs it) - Address (optional) - Profile photo
+(optional) - Church/membership selection if applicable - Consent to
+privacy notice and terms
+
+Do not require unnecessary sensitive information during initial
+registration. Collect extended church profile information after
+registration and explain why it is needed.
+
+Believer registration workflow: 1. User enters phone number. 2. Firebase
+sends OTP. 3. User verifies OTP. 4. User completes basic registration.
+5. Create a membership application with status PENDING. 6. Pastor or
+authorized admin reviews the application. 7. If approved, assign a
+unique membership ID, for example CC-00001. 8. Activate believer account
+and show the believer dashboard. 9. If rejected, show a respectful
+status and allow correction/resubmission if enabled.
+
+Do not allow an unverified user to access member-only content or other
+members’ records.
+
+============================================================ 4. BELIEVER
+APP FEATURES
+============================================================
+
+4.1 BELIEVER HOME DASHBOARD
+
+Display: - Greeting using the believer’s first name. - Profile photo and
+membership status. - Daily Bible verse in selected language. - Today’s
+announcements. - Upcoming events. - Subscription status and next due
+date. - Quick actions: Prayer Request, Offerings, Sermons, Events,
+Profile. - Latest sermon or devotional. - Notification icon with unread
+count.
+
+Use a clean, welcoming and peaceful design. Avoid overcrowding the home
+screen.
+
+4.2 PERSONAL PROFILE AND CHURCH MEMBERSHIP
+
+Profile fields: - Unique membership ID - Profile photo - Full name -
+Date of birth - Gender (optional) - Phone number - Email (optional) -
+Address - Emergency contact (optional, only if needed) - Father’s name
+(optional) - Mother’s name (optional) - Spouse name (optional) -
+Children/dependants (optional) - Church joining date - Membership
+status - Baptism status - Baptism date - Baptism location - Baptized by
+/ pastor name - Ministry or fellowship group - Profile verification
+status
+
+Features: - View and edit permitted fields. - Request changes to
+verified fields. - Upload profile picture. - Upload baptism certificate
+(optional). - View membership history. - View digital membership card
+with QR code. - Download/share membership card only if enabled by
+church.
+
+The QR code must contain a random membership identifier or secure
+verification token, not private personal details. QR scans must not
+expose full profiles to unauthenticated users.
+
+4.3 DAILY BIBLE VERSE AND DEVOTIONAL
+
+Features: - Verse of the day. - Bible book, chapter and verse
+reference. - Tamil and English display. - Short devotional/reflection. -
+Save favourite verses. - Share verse as text or image. - Browse previous
+verses. - Optional daily reminder notification. - Admin/pastor content
+publishing.
+
+Copyright requirement: Use public-domain Bible translations or
+translations for which the church has the required license. Do not
+scrape or reproduce copyrighted Bible translations without permission.
+Store translation/source metadata for each verse. Allow the church to
+configure approved translations.
+
+4.4 ANNOUNCEMENTS
+
+Believers can: - View announcements. - Filter by category. - View
+attached image, poster or PDF. - See publish date and expiry date. -
+Receive push notifications. - View Tamil or English content. - Mark an
+announcement as read.
+
+Announcement categories: - Sunday service - Prayer meeting - Fasting
+prayer - Youth meeting - Women’s fellowship - Men’s fellowship -
+Children’s ministry - Special events - General notice - Emergency notice
+
+4.5 MONTHLY SUBSCRIPTIONS
+
+This is a church-configured monthly contribution/dues module. Do not
+assume all churches require mandatory subscriptions.
+
+Features: - Admin-configurable monthly amount. - Different amount rules
+if the church authorizes them. - Due date and grace period. - Monthly
+payment status. - Paid, pending, overdue, waived and partially paid
+states. - Payment history. - Online payment option. - Cash/manual
+payment entry by authorized finance staff. - Receipt generation. -
+Payment reminder notifications. - Exemption/waiver with reason and audit
+record. - Partial payment support if enabled. - Member can view only
+their own records.
+
+Important distinction: Monthly subscriptions/dues and voluntary
+offerings/donations must be separate modules and separate accounting
+records.
+
+Payment safety: - Integrate a supported payment gateway such as Razorpay
+only after merchant account setup. - Use gateway test mode during
+development. - Create payment orders on a trusted backend/Cloud
+Function. - Verify gateway signatures and payment status on the
+backend. - Never mark a payment paid based only on a client callback or
+screenshot. - Use idempotency/unique transaction IDs to prevent
+duplicate records. - Store gateway references, amount, currency, status,
+timestamps and receipt reference. - Do not store card numbers, UPI PINs
+or banking passwords. - Provide clear failed/pending/success states. -
+Refunds and reversals must be recorded and auditable.
+
+4.6 OFFERINGS AND DONATIONS
+
+Separate categories: - General offering - Tithe - Special offering -
+Missionary support - Church building fund - Charity/welfare - Other
+church-approved category
+
+Believer features: - Select category. - Enter amount. - Add optional
+note. - Pay online or follow church-approved offline process. - View own
+offering history. - Download receipt. - View donation campaign details.
+
+Admin features: - Create and manage donation categories/campaigns. -
+View authorized collection reports. - Record cash/offline donations. -
+Reconcile online payments. - Export reports. - Maintain audit records.
+
+Do not display public donor lists or amounts without explicit consent.
+
+4.7 PRAYER REQUESTS
+
+Believers can: - Submit prayer title and description. - Select privacy:
+pastor-only, authorized prayer team, or share with congregation (only if
+enabled and explicitly consented). - Choose whether their name is
+displayed. - View their own request status. - Receive a private response
+or encouragement. - Withdraw/delete a request where policy permits.
+
+Pastor can: - View requests they are authorized to access. - Assign a
+request to an authorized prayer team member. - Add private pastoral
+notes. - Respond to the believer. - Update status: New, In Review,
+Prayed For, Responded, Closed.
+
+Never expose private prayer requests in general announcements or public
+notifications. Notifications should avoid revealing sensitive content on
+a lock screen.
+
+4.8 SERMONS AND MEDIA
+
+-   Sermon title and description.
+-   Speaker/pastor.
+-   Date.
+-   Bible passage/reference.
+-   Video URL or approved hosted media.
+-   Audio URL.
+-   PDF sermon notes.
+-   Categories and search.
+-   Favourite/save sermon.
+-   Playback controls.
+-   Share sermon link.
+-   Admin upload and publishing workflow.
+
+Prefer approved video hosting (for example, a church YouTube channel)
+rather than storing large video files directly in Firebase Storage.
+Respect media copyright and access permissions.
+
+4.9 EVENTS AND REGISTRATION
+
+-   Event title.
+-   Tamil and English descriptions.
+-   Date and start/end time.
+-   Venue/location.
+-   Poster/image.
+-   Organizer.
+-   Registration required or optional.
+-   Capacity/registration limit.
+-   Registration status.
+-   Reminder notifications.
+-   Attendance check-in.
+-   Past and upcoming event history.
+
+4.10 ATTENDANCE
+
+-   Believer can view their own attendance history if enabled.
+-   Pastor/authorized staff can record attendance for services and
+    events.
+-   Support manual attendance and QR check-in.
+-   QR check-in must use a time-limited or event-specific token to
+    reduce misuse.
+-   Prevent duplicate attendance entries.
+-   Reports by date, service, event and member.
+-   Do not use location tracking unless truly necessary and separately
+    consented.
+
+4.11 COUNSELLING APPOINTMENTS
+
+-   Believer can request an appointment.
+-   Choose from available slots.
+-   Select in-person or approved online meeting.
+-   Provide optional reason with privacy warning.
+-   Pastor can accept, reschedule or decline.
+-   Private appointment status and reminders.
+-   Only assigned pastor/authorized personnel can access details.
+
+Do not implement open-ended public chat for sensitive counselling in the
+first release. Use controlled appointment requests and private
+responses.
+
+4.12 TESTIMONIES
+
+-   Believer submits testimony.
+-   Choose whether name may be displayed.
+-   Pastor reviews and approves.
+-   Approved testimony appears in the testimony section.
+-   User can request removal.
+-   Do not publish private information without consent.
+
+4.13 NOTIFICATIONS
+
+Push notifications for: - New announcement - Upcoming event - Daily
+Bible verse reminder - Subscription due reminder - Payment receipt -
+Prayer response - Counselling appointment update - Sermon published
+
+Allow users to control non-essential notification preferences. Use
+topic/audience targeting safely; never send sensitive member information
+in notification payloads.
+
+============================================================ 5. PASTOR
+DASHBOARD FEATURES
+============================================================
+
+5.1 PASTOR HOME Show summary cards: - Total believers - Active members -
+Pending membership applications - New members - Today’s attendance -
+Upcoming events - Pending prayer requests - Subscription collection
+summary (only with finance permission) - Offering summary (only with
+finance permission)
+
+5.2 BELIEVER MANAGEMENT - List and search believers. - Search by name,
+membership ID or phone number where authorized. - Filter by
+active/inactive, baptism status, ministry, age group and subscription
+status. - View member profile according to permissions. - Approve/reject
+membership applications. - Add member manually. - Edit permitted
+details. - Deactivate/reactivate membership with reason. - Assign
+ministry/fellowship. - Record membership notes with restricted access. -
+Export authorized records.
+
+5.3 BAPTISM REGISTER - Member ID and name. - Baptism date. - Baptism
+place. - Baptized by. - Certificate upload. - Notes. - Search and
+filter. - Edit history/audit trail.
+
+5.4 ANNOUNCEMENT MANAGEMENT - Create/edit/draft/publish/archive
+announcement. - Tamil and English title/body. - Add images, PDF or
+poster. - Select target group. - Schedule publish date. - Set expiry
+date. - Send push notification. - Emergency notice option with
+confirmation. - Preview before publishing.
+
+5.5 BIBLE VERSE MANAGEMENT - Add/edit daily verse. - Select approved
+translation. - Enter reference. - Add devotional explanation in Tamil
+and English. - Schedule future verses. - Preview and publish.
+
+5.6 SERMON MANAGEMENT - Add sermon metadata. - Add video/audio link. -
+Attach notes/PDF. - Set visibility. - Publish/archive. - View engagement
+statistics if enabled.
+
+5.7 EVENT MANAGEMENT - Create and update events. - Manage
+registrations. - Manage capacity. - View attendance. - Send reminders. -
+Export attendee list.
+
+5.8 PRAYER REQUEST MANAGEMENT - View authorized requests. - Assign
+prayer team. - Respond privately. - Add restricted notes. - Update
+status. - Preserve privacy choices.
+
+5.9 COUNSELLING MANAGEMENT - Set available time slots. -
+Approve/reschedule/cancel appointments. - View assigned appointments
+only. - Send private updates.
+
+5.10 ATTENDANCE MANAGEMENT - Create service/session. - Record manual or
+QR attendance. - Correct entries with reason. - Prevent duplicates. -
+Generate reports.
+
+5.11 FINANCIAL MANAGEMENT (PERMISSION-BASED) - Monthly subscriptions and
+dues. - Offerings/donations. - Online and cash payments. -
+Pending/failed transactions. - Waivers and partial payments. -
+Receipts. - Daily/monthly/yearly reports. - Export records. -
+Reconciliation. - Financial dashboard only for authorized roles.
+
+5.12 MINISTRY MANAGEMENT - Create ministry groups. - Assign leaders. -
+Add/remove members. - Publish group-specific announcements. - Manage
+group events.
+
+============================================================ 6. SUPER
+ADMIN FEATURES
+============================================================
+
+Super Admin dashboard must include:
+
+-   System overview.
+-   Church configuration.
+-   Pastor account creation and approval.
+-   Pastor assignment to church.
+-   Pastor permission management.
+-   Believer account management.
+-   Role management.
+-   Subscription amount and due-date configuration.
+-   Offering category configuration.
+-   Payment gateway configuration status (never expose secret keys in
+    app).
+-   Content moderation.
+-   Announcement and notification management.
+-   Language/content configuration.
+-   Audit log viewer.
+-   Data export request handling.
+-   Backup/restore status.
+-   Error and crash monitoring links/information.
+-   Account suspension/reactivation.
+-   System maintenance settings.
+
+Super Admin security: - No public Super Admin registration. - Provision
+initial Super Admin through a trusted developer-controlled process. -
+Require strong authentication and preferably additional verification for
+sensitive actions. - Log role changes, account suspensions, financial
+corrections, exports and deletions. - Use confirmation dialogs for
+destructive operations. - Do not permit silent deletion of financial
+history or audit logs.
+
+============================================================ 7. ANDROID
+APP NAVIGATION AND SCREENS
+============================================================
+
+One Android app with role-based navigation.
+
+BELIEVER BOTTOM NAVIGATION: 1. Home 2. Bible 3. Prayer 4. Events 5.
+Profile
+
+Additional destinations: - Announcements - Subscriptions - Offerings -
+Payment history - Receipts - Sermons - Attendance history -
+Counselling - Testimonies - Notifications - Settings - Help and privacy
+
+PASTOR NAVIGATION: 1. Dashboard 2. Members 3. Announcements 4. Finance
+(only if authorized) 5. More/Settings
+
+Additional destinations: - Membership applications - Baptism register -
+Attendance - Prayer requests - Counselling - Sermons - Events -
+Ministries - Bible verse management - Reports - Notifications - Profile
+
+SUPER ADMIN NAVIGATION: 1. Overview 2. Accounts 3. Churches 4. Reports
+5. Settings
+
+Additional destinations: - Pastor management - Believer management -
+Roles and permissions - Financial configuration - Payment
+reconciliation - Content management - Audit logs - Backups - System
+health
+
+The app must route users to the correct dashboard after authentication.
+Navigation visibility is not security; backend rules must enforce all
+permissions.
+
+============================================================ 8. UI/UX
+DESIGN SYSTEM
+============================================================
+
+Design direction: Premium, peaceful, modern Christian application. It
+should feel welcoming and trustworthy, not crowded or overly decorative.
+
+BELIEVER THEME: - Warm ivory / cream background. - White cards. - Muted
+gold accents. - Deep navy or dark brown text. - Soft green success
+states. - Clear typography. - Gentle cross/Bible-inspired visual
+identity.
+
+PASTOR AND SUPER ADMIN THEME: - Navy blue. - White/light grey
+surfaces. - Gold accent. - Clear data tables/cards and charts. -
+Professional administrative layout.
+
+General UI requirements: - Material 3 components. - Responsive layouts
+for phones and tablets. - Light and dark themes. - Consistent spacing
+and typography. - Loading, empty, error, offline and success states for
+every data-driven screen. - Confirmation dialogs for sensitive
+actions. - Form validation and helpful error messages. - Accessible
+contrast and touch target sizes. - Tamil text must render correctly. -
+No text clipped on smaller screens. - Avoid unnecessary animations. -
+Use reusable Compose components. - All screen strings must come from
+localized resources.
+
+Suggested app identity: Name: Church Connect Tagline: Growing in Faith.
+Connected as One Family. Logo concept: Minimal cross combined with a
+subtle connection/circle motif. Do not use copyrighted church logos or
+artwork without permission.
+
+============================================================ 9.
+TECHNICAL ARCHITECTURE
+============================================================
+
+Use a clean, modular MVVM architecture.
+
+Recommended layers:
+
+PRESENTATION: - Jetpack Compose screens - Reusable UI components -
+Navigation - ViewModels - UI state classes - Localization
+
+DOMAIN: - Use cases/business rules - Domain models - Repository
+interfaces - Role/permission rules
+
+DATA: - Repository implementations - Firestore data sources - Firebase
+Auth data source - Firebase Storage data source - Cloud Functions
+client - DTO-to-domain mapping - Offline/cache handling where
+appropriate
+
+CORE: - Dependency injection - Theme - Localization - Logging - Error
+handling - Network status - Security/session utilities
+
+Suggested package structure:
+
+com.churchconnect app/ MainActivity.kt ChurchConnectApp.kt
+AppNavigation.kt core/ common/ design/ localization/ network/ security/
+util/ data/ auth/ firestore/ storage/ repositories/ models/ domain/
+model/ repository/ usecase/ feature/ onboarding/ authentication/
+believer/ profile/ bible/ announcements/ subscriptions/ offerings/
+prayer/ sermons/ events/ attendance/ baptism/ counselling/ testimonies/
+pastor/ superadmin/ notifications/ settings/ di/ MainApplication.kt
+
+Use feature-based packages. Keep ViewModels focused and do not put
+Firestore calls directly inside Composable functions.
+
+Use: - StateFlow for screen state. - Kotlin Coroutines for asynchronous
+work. - Repository interfaces for testability. - Sealed classes/data
+classes for loading, success and error states. - Navigation arguments
+using stable IDs, not full private user objects. - Centralized error
+mapping. - Unit tests for business logic and permission rules.
+
+============================================================ 10.
+FIRESTORE DATABASE DESIGN
+============================================================
+
+Use church-aware collection paths or a consistently enforced churchId
+field. For initial single-church launch, create one church record and
+require every church-owned document to reference it.
+
+Suggested structure:
+
+churches/{churchId} - name - logoUrl - address - phone - email -
+defaultLanguage - supportedLanguages - serviceTimings - settings -
+createdAt - updatedAt
+
+users/{uid} - uid - phoneNumber - email - role - churchId -
+accountStatus - createdAt - updatedAt
+
+believers/{memberId} - uid - churchId - membershipId - fullName -
+profilePhotoUrl - dateOfBirth - gender - phoneNumber - email - address -
+familyDetails - churchJoiningDate - baptismStatus - baptismDate -
+baptismPlace - baptizedBy - ministryIds - membershipStatus -
+approvalStatus - createdAt - updatedAt
+
+pastors/{pastorId} - uid - churchId - fullName - photoUrl -
+designation - permissions - accountStatus - createdAt
+
+membershipApplications/{applicationId} - uid - churchId -
+submittedData - status - reviewedBy - reviewNote - submittedAt -
+reviewedAt
+
+bibleVerses/{verseId} - churchId - date - reference - translationId -
+tamilText - englishText - tamilDevotional - englishDevotional -
+sourceLicense - published - createdBy
+
+announcements/{announcementId} - churchId - titleTa - titleEn - bodyTa -
+bodyEn - category - attachmentUrls - targetAudience - publishAt -
+expiresAt - status - createdBy - createdAt
+
+subscriptions/{subscriptionId} - churchId - memberId - billingMonth -
+amountDue - amountPaid - currency - dueDate - status - waiverReason -
+createdAt - updatedAt
+
+payments/{paymentId} - churchId - memberId - category -
+relatedSubscriptionId - amount - currency - paymentMethod - gateway -
+gatewayOrderId - gatewayPaymentId - transactionStatus - verifiedAt -
+receiptNumber - createdAt
+
+offerings/{offeringId} - churchId - memberId - category - amount -
+currency - paymentId - donorDisplayConsent - receiptNumber - createdAt
+
+prayerRequests/{requestId} - churchId - memberId - title - description -
+privacyLevel - anonymous - assignedTo - status - response - createdAt -
+updatedAt
+
+sermons/{sermonId} - churchId - titleTa - titleEn - descriptionTa -
+descriptionEn - speaker - bibleReference - videoUrl - audioUrl -
+notesUrl - publishedAt - status
+
+events/{eventId} - churchId - titleTa - titleEn - descriptionTa -
+descriptionEn - venue - startAt - endAt - posterUrl - capacity -
+registrationRequired - status
+
+eventRegistrations/{registrationId} - churchId - eventId - memberId -
+status - registeredAt
+
+attendanceSessions/{sessionId} - churchId - title - eventId -
+serviceDate - createdBy
+
+attendanceRecords/{recordId} - churchId - sessionId - memberId -
+checkInMethod - checkedInAt - recordedBy
+
+baptisms/{baptismId} - churchId - memberId - baptismDate -
+baptismPlace - baptizedBy - certificateUrl - notes - createdAt
+
+counsellingAppointments/{appointmentId} - churchId - memberId -
+pastorId - requestedAt - appointmentAt - meetingType - privateReason -
+status - createdAt
+
+testimonies/{testimonyId} - churchId - memberId - content -
+displayNameConsent - status - reviewedBy - createdAt
+
+ministries/{ministryId} - churchId - nameTa - nameEn - leaderIds -
+memberIds - status
+
+notifications/{notificationId} - churchId - recipientUid - title -
+body - type - relatedRecordId - readAt - createdAt
+
+auditLogs/{logId} - churchId - actorUid - actorRole - action -
+targetType - targetId - timestamp - reason - metadata
+
+This is a logical schema. Refine it for Firestore query patterns,
+document size limits, indexing and privacy. Do not put large lists or
+unbounded histories into one document. Use subcollections or separate
+documents for growing records. Never put secrets in Firestore documents
+accessible to clients.
+
+============================================================ 11.
+SECURITY, PRIVACY AND COMPLIANCE
+============================================================
+
+Security is a core requirement, not a final polish task.
+
+Implement: - Firebase Authentication. - Firestore Security Rules. -
+Firebase Storage Security Rules. - Trusted Cloud Functions for
+privileged operations. - Role and church assignment validation. -
+Least-privilege access. - Input validation on client and server. - App
+Check where supported. - Secure handling of OTP and sessions. - Audit
+logs for sensitive actions. - Regular backup and restore testing. -
+Secure secrets management. - No API secret keys inside the Android
+APK. - No public read access to member records. - No public access to
+private prayer/counselling records. - No unrestricted access to
+financial records.
+
+Data privacy: - Show a privacy notice before collecting personal data. -
+Collect only information needed by the church. - Explain why optional
+family and spiritual details are requested. - Obtain appropriate
+consent. - Provide a way to request correction or deletion, subject to
+lawful retention requirements. - Define retention periods for financial,
+membership and counselling records. - Restrict exports and log who
+performs them. - Do not log OTPs, passwords, full phone numbers, private
+prayer text or payment secrets. - Follow applicable Indian data
+protection requirements, including the Digital Personal Data Protection
+framework and rules in force at deployment.
+
+Create test cases proving: 1. Believer A cannot read Believer B’s
+private profile. 2. Believer cannot change their own role. 3. Believer
+cannot approve their own membership. 4. Pastor cannot access another
+church’s records. 5. Pastor without finance permission cannot read
+financial collections. 6. Private prayer requests are visible only to
+authorized recipients. 7. Client cannot mark a payment as successful. 8.
+Unauthenticated users cannot read private records. 9. Suspended accounts
+cannot access protected features. 10. Super Admin role cannot be granted
+from the client.
+
+============================================================ 12. PAYMENT
+AND FINANCE DESIGN
+============================================================
+
+Use Razorpay or another approved payment gateway after the church has a
+verified merchant account.
+
+Development sequence: 1. Implement payment data models. 2. Implement
+payment status UI with test data clearly labelled. 3. Create a trusted
+backend order-creation function. 4. Launch gateway checkout in test
+mode. 5. Verify gateway signature on the backend. 6. Process verified
+webhooks. 7. Update payment and subscription records
+transactionally/idempotently. 8. Generate receipts only after verified
+success. 9. Test success, failure, cancellation, pending and duplicate
+webhook cases. 10. Switch to live mode only after merchant approval and
+end-to-end testing.
+
+Do not promise automatic recurring debits unless the gateway, merchant
+account and required customer authorization support them. A monthly due
+reminder and a recurring auto-debit are different features.
+
+Financial reports: - Daily collections. - Monthly subscription
+collections. - Offering category totals. - Cash versus online. - Pending
+and failed transactions. - Refunds/reversals. - Member-wise history for
+authorized finance users. - Downloadable CSV/PDF reports.
+
+Use INR as the default currency, but make currency a church
+configuration.
+
+============================================================ 13. OFFLINE
+AND PERFORMANCE REQUIREMENTS
+============================================================
+
+-   App should show cached non-sensitive content where practical.
+-   Show a clear offline indicator.
+-   Do not queue sensitive financial actions blindly while offline.
+-   Avoid duplicate submissions when network reconnects.
+-   Use pagination for large member lists.
+-   Compress profile images before upload.
+-   Use thumbnails for media.
+-   Lazy-load lists and images.
+-   Handle slow networks and OTP timeouts.
+-   Show retry options.
+-   Avoid loading all church members into memory.
+-   Use Firestore indexes for common filters.
+-   Keep startup time and screen transitions responsive.
+
+============================================================ 14. TESTING
+PLAN ============================================================
+
+Unit tests: - Validation. - Membership ID generation. - Role/permission
+logic. - Subscription calculations. - Payment status transitions. - Date
+and language formatting.
+
+Integration tests: - Authentication. - Registration and approval. -
+Profile editing. - Announcement publishing. - Prayer request privacy. -
+Payment verification. - Attendance recording. - Notification delivery.
+
+UI tests: - Tamil and English layouts. - Small and large Android
+screens. - Navigation by role. - Loading and error states. - Form
+validation. - Accessibility basics.
+
+Security tests: - Firestore rules emulator tests. - Storage rules
+tests. - Cross-user access attempts. - Cross-church access attempts. -
+Privilege escalation attempts. - Forged payment callback attempts. -
+Duplicate payment/webhook attempts.
+
+Before launch: - Test on real Android devices. - Test low network
+conditions. - Test OTP delivery. - Test payment gateway sandbox. - Test
+backup restoration. - Verify privacy policy and app permissions. -
+Verify Play Store data safety declarations.
+
+============================================================ 15.
+DEVELOPMENT PHASES AND ACCEPTANCE CRITERIA
+============================================================
+
+PHASE 1: FOUNDATION Build: - Android Studio Kotlin project. - Jetpack
+Compose and Material 3. - App theme and reusable components. -
+Tamil/English localization. - Firebase project connection. -
+Authentication. - Role-based navigation.
+
+Acceptance: - App builds and runs. - User can select language. - OTP
+authentication works in configured test environment. - User is routed to
+the correct role dashboard. - Unapproved users cannot enter the believer
+dashboard.
+
+PHASE 2: BELIEVER PROFILE Build: - Registration and membership
+application. - Profile photo upload. - Personal and church details. -
+Baptism details. - Membership ID and QR card.
+
+Acceptance: - Member can submit an application. - Pastor can approve
+it. - Approved member receives a unique ID. - Member can only access
+permitted personal data.
+
+PHASE 3: CHURCH CONTENT Build: - Daily Bible verse. - Announcements. -
+Events. - Sermons. - Notifications.
+
+Acceptance: - Pastor can publish content. - Believers can view content
+in Tamil and English. - Push notifications reach intended users. -
+Expired announcements are handled correctly.
+
+PHASE 4: FINANCE Build: - Monthly dues. - Offerings. - Payment gateway
+sandbox. - Receipts. - Finance reports.
+
+Acceptance: - Client cannot fake payment success. - Verified payments
+update records once. - Member sees only their own history. -
+Unauthorized pastor cannot access financial data.
+
+PHASE 5: PASTOR MANAGEMENT Build: - Member search and filters. - Baptism
+register. - Attendance. - Prayer requests. - Counselling. -
+Ministries. - Reports.
+
+Acceptance: - Pastor can manage assigned church records. - Sensitive
+data remains restricted. - Important changes are audited.
+
+PHASE 6: SUPER ADMIN Build: - Pastor management. - Permission
+management. - Church configuration. - Audit logs. - Financial
+configuration. - Backup/status screens.
+
+Acceptance: - Only provisioned Super Admin can access this dashboard. -
+Role changes happen through trusted backend logic. - Administrative
+actions are logged.
+
+PHASE 7: ADVANCED FEATURES Build: - Testimonies. - Bible study plans. -
+Live service integration. - Advanced notifications. - Optional AI Bible
+assistant.
+
+Acceptance: - All advanced features respect content licensing, privacy
+and access rules.
+
+PHASE 8: RELEASE - Full regression testing. - Security rules review. -
+Performance optimization. - Privacy policy. - App icon and
+screenshots. - Signed Android App Bundle. - Internal testing track. -
+Production release after church approval.
+
+============================================================ 16. GOOGLE
+AI STUDIO WORKING INSTRUCTIONS
+============================================================
+
+Act as a senior Android architect, Kotlin developer, Jetpack Compose
+specialist, Firebase backend engineer and security reviewer.
+
+Your task is to help implement the complete Church Connect native
+Android application described in this document.
+
+STRICT RULES: 1. Use Android Studio, Kotlin and Jetpack Compose. Do not
+switch to Flutter, React Native or a website. 2. Follow MVVM, repository
+pattern and modular feature organization. 3. Keep code compilable at
+each milestone. 4. Give exact file paths for every file. 5. When
+modifying a file, provide its complete updated contents. 6. Include
+Gradle dependencies and configuration changes. 7. Explain Firebase
+Console setup when required. 8. Never put service account keys, payment
+secrets or private API keys in Android source code. 9. Implement real
+Firebase operations for features once configuration is available. Do not
+pretend mock data is live data. 10. Clearly label mock/demo data. 11. Do
+not create fake payment success. 12. Implement server-side role checks
+and Firestore/Storage Security Rules. 13. Include error, loading, empty
+and offline states. 14. Use Tamil and English string resources for all
+visible UI text. 15. Keep UI reusable, accessible and responsive. 16. Do
+not remove an existing working feature when adding another feature. 17.
+Do not provide partial snippets when a complete file is needed to
+compile. 18. Add unit and security tests for important business rules.
+19. Explain any manual steps that the developer must perform. 20. If a
+requirement is ambiguous, ask a focused question rather than silently
+inventing a financial, privacy or church policy.
+
+WORKING METHOD: - First inspect the current Android Studio project and
+its existing files. - If no project exists, provide the exact Android
+Studio project creation settings. - Present the proposed architecture
+and dependency list. - Implement Phase 1 only. - Make sure Phase 1
+builds before moving to Phase 2. - At the end of each phase, provide: a.
+Files created/modified. b. Firebase Console steps. c. How to run the
+app. d. Test steps. e. Known limitations. f. What is needed for the next
+phase. - Do not claim the app is complete until all acceptance criteria
+and tests have passed.
+
+FIRST TASK: Start with PHASE 1 FOUNDATION ONLY.
+
+Create: 1. Native Android project setup instructions. 2. Kotlin and
+Gradle configuration. 3. Material 3 theme. 4. Church Connect
+splash/welcome screen. 5. Tamil and English language selection and
+persistence. 6. Firebase Authentication setup instructions. 7. Phone
+number OTP login and verification flow. 8. User role model and secure
+role-loading architecture. 9. Believer, Pastor and Super Admin
+navigation shells. 10. Loading, error and pending-approval screens. 11.
+Initial Firestore schema outline. 12. Initial Firestore Security Rules
+and emulator tests.
+
+Do not implement all future features in Phase 1. Keep the project clean,
+secure and ready for the next phase.
+
+============================================================ 17. ITEMS
+TO CONFIRM WITH THE CHURCH BEFORE LIVE LAUNCH
+============================================================
+
+These are church policy decisions and must not be invented by the
+developer:
+
+-   Official church name, logo and address.
+-   Whether the first release is for one church only.
+-   Who is authorized to approve new believers.
+-   Which pastor roles exist and their permissions.
+-   Whether monthly subscriptions are mandatory or voluntary.
+-   Monthly amount, due date, grace period and exemption policy.
+-   Whether partial payments are allowed.
+-   Approved offering categories.
+-   Who can view financial records.
+-   Whether prayer requests can be shared with a prayer team.
+-   Who can access counselling records.
+-   Approved Bible translations and licensing.
+-   Church attendance policy.
+-   Data retention and deletion policy.
+-   Payment merchant account and refund policy.
+-   Official Tamil and English content reviewers.
+-   Church privacy policy and terms.
+
+============================================================ 18. FINAL
+PRODUCT GOAL
+============================================================
+
+Church Connect should become a secure, reliable and easy-to-use digital
+platform for church life.
+
+Believers should be able to: - Stay connected with their church. - Read
+daily Bible verses. - Receive announcements. - Maintain their membership
+profile. - View baptism and church records. - Manage subscriptions and
+offerings. - Submit prayer requests. - Watch sermons and join events.
+
+Pastors should be able to: - Manage believers. - Publish church
+content. - Maintain church records. - Organize events and attendance. -
+Support believers through prayer and counselling. - Access authorized
+financial reports.
+
+Super Admin should be able to: - Manage pastors and permissions. -
+Configure the church. - Control system settings. - Monitor financial and
+administrative operations. - Maintain security and accountability.
+
+Build for trust, privacy, clarity, accessibility and long-term
+maintainability.
+
+PROJECT NAME: CHURCH CONNECT PLATFORM: NATIVE ANDROID LANGUAGES: TAMIL
+AND ENGLISH TECH STACK: KOTLIN + JETPACK COMPOSE + FIREBASE ROLES:
+BELIEVER + PASTOR + SUPER ADMIN INITIAL RELEASE: ONE CHURCH,
+MULTI-CHURCH-READY DATA ARCHITECTURE

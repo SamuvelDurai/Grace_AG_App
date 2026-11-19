@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChurchConnectFirestoreBlueprint",
+  "description": "Firestore schema for Church Connect Android app with tenant-aware church isolation and role-based access control.",
+  "entities": {
+    "Church": {
+      "collection": "churches",
+      "documentId": "churchId",
+      "fields": {
+        "name": { "type": "string", "required": true },
+        "address": { "type": "string", "required": false },
+        "phone": { "type": "string", "required": false },
+        "email": { "type": "string", "required": false },
+        "defaultLanguage": { "type": "string", "required": true },
+        "serviceTimings": { "type": "string", "required": false },
+        "monthlyDuesAmount": { "type": "number", "required": false },
+        "upiId": { "type": "string", "required": false },
+        "bankAccountDetails": { "type": "string", "required": false },
+        "latestVersionCode": { "type": "integer", "required": false },
+        "latestVersionName": { "type": "string", "required": false },
+        "updateDownloadUrl": { "type": "string", "required": false },
+        "updateReleaseNotes": { "type": "string", "required": false },
+        "forceUpdate": { "type": "boolean", "required": false },
+        "adminUid": { "type": "string", "required": false },
+        "adminEmail": { "type": "string", "required": false },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "User": {
+      "collection": "users",
+      "documentId": "uid",
+      "fields": {
+        "uid": { "type": "string", "required": true },
+        "phoneNumber": { "type": "string", "required": false },
+        "email": { "type": "string", "required": false },
+        "displayName": { "type": "string", "required": true },
+        "role": { "type": "string", "enum": ["BELIEVER", "PASTOR", "SUPER_ADMIN"], "required": true },
+        "churchId": { "type": "string", "required": true },
+        "accountStatus": { "type": "string", "enum": ["PENDING", "APPROVED", "SUSPENDED", "REJECTED"], "required": true },
+        "membershipId": { "type": "string", "required": false },
+        "familyId": { "type": "string", "required": false },
+        "photoUrl": { "type": "string", "required": false },
+        "fcmToken": { "type": "string", "required": false },
+        "createdAt": { "type": "timestamp", "required": true },
+        "updatedAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "Believer": {
+      "collection": "believers",
+      "documentId": "memberId",
+      "fields": {
+        "uid": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "membershipId": { "type": "string", "required": true },
+        "fullName": { "type": "string", "required": true },
+        "profilePhotoUrl": { "type": "string", "required": false },
+        "phoneNumber": { "type": "string", "required": true },
+        "email": { "type": "string", "required": false },
+        "address": { "type": "string", "required": false },
+        "familyId": { "type": "string", "required": false },
+        "familyRole": { "type": "string", "required": false },
+        "membershipStatus": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "MemberLookup": {
+      "collection": "memberLookup",
+      "documentId": "lookupId",
+      "fields": {
+        "uid": { "type": "string", "required": true },
+        "memberId": { "type": "string", "required": true },
+        "membershipId": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "fullName": { "type": "string", "required": true },
+        "phoneNumber": { "type": "string", "required": false },
+        "profilePhotoUrl": { "type": "string", "required": false },
+        "familyId": { "type": "string", "required": false }
+      }
+    },
+    "Family": {
+      "collection": "families",
+      "documentId": "familyId",
+      "fields": {
+        "familyId": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "familyName": { "type": "string", "required": true },
+        "headUid": { "type": "string", "required": true },
+        "headMemberId": { "type": "string", "required": false },
+        "headName": { "type": "string", "required": true },
+        "headPhone": { "type": "string", "required": false },
+        "address": { "type": "string", "required": false },
+        "dependentMembers": { "type": "array", "required": true },
+        "linkedMemberUids": { "type": "array", "required": true },
+        "sharedSubscriptionStatus": { "type": "string", "enum": ["PAID", "PENDING", "PENDING_VERIFICATION", "OVERDUE", "WAIVED"], "required": true },
+        "lastSubscriptionId": { "type": "string", "required": false },
+        "lastPaidMonthYear": { "type": "string", "required": false },
+        "lastPaidDate": { "type": "string", "required": false },
+        "lastPaidByUid": { "type": "string", "required": false },
+        "lastPaidByName": { "type": "string", "required": false },
+        "monthlyDuesAmount": { "type": "number", "required": false },
+        "createdAt": { "type": "timestamp", "required": false },
+        "updatedAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "MembershipApplication": {
+      "collection": "membershipApplications",
+      "documentId": "applicationId",
+      "fields": {
+        "uid": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "fullName": { "type": "string", "required": true },
+        "phoneNumber": { "type": "string", "required": true },
+        "email": { "type": "string", "required": false },
+        "address": { "type": "string", "required": false },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"], "required": true },
+        "submittedAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "Announcement": {
+      "collection": "announcements",
+      "documentId": "announcementId",
+      "fields": {
+        "churchId": { "type": "string", "required": true },
+        "titleTamil": { "type": "string", "required": true },
+        "titleEnglish": { "type": "string", "required": true },
+        "bodyTamil": { "type": "string", "required": true },
+        "bodyEnglish": { "type": "string", "required": true },
+        "category": { "type": "string", "required": true },
+        "createdBy": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "BibleVerse": {
+      "collection": "bibleVerses",
+      "documentId": "verseId",
+      "fields": {
+        "churchId": { "type": "string", "required": true },
+        "bookReference": { "type": "string", "required": true },
+        "textTamil": { "type": "string", "required": true },
+        "textEnglish": { "type": "string", "required": true },
+        "devotionalEnglish": { "type": "string", "required": false },
+        "devotionalTamil": { "type": "string", "required": false },
+        "pinDateKey": { "type": "string", "required": false },
+        "publishedByPastor": { "type": "string", "required": false },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "DailyVerseConfig": {
+      "collection": "dailyVerseConfig",
+      "documentId": "churchId",
+      "fields": {
+        "churchId": { "type": "string", "required": true },
+        "autoDailyEnabled": { "type": "boolean", "required": true },
+        "rotationHour": { "type": "integer", "required": false },
+        "updatedByName": { "type": "string", "required": false },
+        "updatedByUid": { "type": "string", "required": true },
+        "updatedAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "PrayerRequest": {
+      "collection": "prayerRequests",
+      "documentId": "requestId",
+      "fields": {
+        "uid": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "title": { "type": "string", "required": true },
+        "description": { "type": "string", "required": true },
+        "privacy": { "type": "string", "enum": ["PASTOR_ONLY", "PRAYER_INTERCESSORS", "CHURCH_FAMILY"], "required": true },
+        "status": { "type": "string", "enum": ["NEW", "IN_REVIEW", "PRAYED_FOR", "CLOSED"], "required": true },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "OfferingTransaction": {
+      "collection": "offerings",
+      "documentId": "transactionId",
+      "fields": {
+        "uid": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "category": { "type": "string", "required": true },
+        "amount": { "type": "number", "required": true },
+        "paymentMethod": { "type": "string", "required": false },
+        "status": { "type": "string", "enum": ["PENDING", "SUCCESS", "FAILED"], "required": true },
+        "transactionReference": { "type": "string", "required": false },
+        "receiptNumber": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "ChurchEvent": {
+      "collection": "events",
+      "documentId": "eventId",
+      "fields": {
+        "eventId": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "titleEnglish": { "type": "string", "required": true },
+        "titleTamil": { "type": "string", "required": false },
+        "eventDate": { "type": "string", "required": true },
+        "startTime": { "type": "string", "required": false },
+        "endTime": { "type": "string", "required": false },
+        "venue": { "type": "string", "required": false },
+        "capacity": { "type": "integer", "required": true },
+        "registeredCount": { "type": "integer", "required": true },
+        "attendeeIds": { "type": "array", "required": false },
+        "category": { "type": "string", "enum": ["SUNDAY_SERVICE", "FASTING_PRAYER", "YOUTH_EVENT", "OUTREACH_MISSION", "SPECIAL_FESTIVAL", "OTHER_EVENT"], "required": false },
+        "createdAt": { "type": "timestamp", "required": false },
+        "updatedAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "Sermon": {
+      "collection": "sermons",
+      "documentId": "sermonId",
+      "fields": {
+        "churchId": { "type": "string", "required": true },
+        "titleEnglish": { "type": "string", "required": true },
+        "speakerName": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "FellowshipGroup": {
+      "collection": "fellowshipGroups",
+      "documentId": "groupId",
+      "fields": {
+        "groupId": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "nameEnglish": { "type": "string", "required": true },
+        "nameTamil": { "type": "string", "required": false },
+        "areaZone": { "type": "string", "required": false },
+        "leaderName": { "type": "string", "required": true },
+        "leaderPhone": { "type": "string", "required": false },
+        "meetingSchedule": { "type": "string", "required": false },
+        "meetingLocation": { "type": "string", "required": false },
+        "memberCount": { "type": "integer", "required": true },
+        "memberIds": { "type": "array", "required": true },
+        "category": { "type": "string", "enum": ["AREA_CARE_CELL", "YOUTH_MINISTRY", "SUNDAY_SCHOOL", "WOMENS_FELLOWSHIP", "MENS_FELLOWSHIP", "CHOIR_WORSHIP", "OTHER_GROUP"], "required": true },
+        "createdAt": { "type": "timestamp", "required": false },
+        "updatedAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "PastoralCareAlert": {
+      "collection": "pastoralCareAlerts",
+      "documentId": "alertId",
+      "fields": {
+        "alertId": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "memberUid": { "type": "string", "required": true },
+        "memberName": { "type": "string", "required": true },
+        "memberPhone": { "type": "string", "required": false },
+        "membershipId": { "type": "string", "required": false },
+        "careType": { "type": "string", "enum": ["BIRTHDAY", "WEDDING_ANNIVERSARY", "HOSPITAL_VISIT", "HOME_BLESSING", "BEREAVEMENT_CARE"], "required": true },
+        "status": { "type": "string", "enum": ["PENDING", "CALLED", "VISITED", "PRAYED"], "required": true },
+        "createdAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "AuditLog": {
+      "collection": "auditLogs",
+      "documentId": "logId",
+      "fields": {
+        "logId": { "type": "string", "required": true },
+        "churchId": { "type": "string", "required": true },
+        "action": { "type": "string", "required": true },
+        "actorName": { "type": "string", "required": false },
+        "actorUid": { "type": "string", "required": true },
+        "timestampText": { "type": "string", "required": false },
+        "status": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    }
+  }
+}

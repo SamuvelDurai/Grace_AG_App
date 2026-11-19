@@ -1,0 +1,175 @@
+<resources>
+    <string name="app_name">GRACE AG</string>
+    <string name="app_tagline">Growing in Faith. Connected as One Family.</string>
+    
+    <!-- Onboarding & Language -->
+    <string name="welcome_title">Welcome to GRACE AG</string>
+    <string name="welcome_subtitle">A bilingual platform connecting believers, pastors, and administrators.</string>
+    <string name="select_language">Select Language / மொழியைத் தேர்ந்தெடுக்கவும்</string>
+    <string name="lang_english">English</string>
+    <string name="lang_tamil">தமிழ் (Tamil)</string>
+    <string name="get_started">Get Started</string>
+    <string name="continue_text">Continue</string>
+    
+    <!-- Authentication -->
+    <string name="sign_in">Sign In</string>
+    <string name="auth_signin_title">GRACE AG Login</string>
+    <string name="auth_signin_subtitle">Pastors, Administrators, and Believers sign in with your Email, Mobile OTP, or Google account.</string>
+    <string name="believer_signup_tab">Believer Sign Up</string>
+    <string name="believer_signup_title">New Believer Sign Up</string>
+    <string name="believer_signup_subtitle">Create your account first, then complete all personal &amp; baptism details for Pastor approval.</string>
+    <string name="create_believer_account">Create Believer Account</string>
+    <string name="create_pastor_account">Create Pastor Account</string>
+    <string name="phone_login_title">Phone Verification</string>
+    <string name="phone_login_subtitle">Enter your 10-digit mobile number to receive an OTP.</string>
+    <string name="phone_label">Phone Number</string>
+    <string name="phone_placeholder">9876543210</string>
+    <string name="country_code">+91</string>
+    <string name="send_otp">Send OTP</string>
+    <string name="verify_otp">Verify &amp; Continue</string>
+    <string name="otp_title">Enter OTP Code</string>
+    <string name="otp_subtitle">Enter the 6-digit code sent to %1$s</string>
+    <string name="resend_otp">Resend OTP</string>
+    <string name="resend_timer">Resend in %1$ds</string>
+    <string name="or_divider">OR</string>
+    <string name="sign_in_google">Sign in with Google</string>
+    <string name="auth_cloud_sync_note">Your login stays active until you sign out, syncing securely with your church cloud database.</string>
+    <string name="phone_invalid_error">Please enter a valid 10-digit phone number</string>
+    <string name="otp_invalid_error">Invalid verification code. Please check and try again.</string>
+
+    <!-- Registration -->
+    <string name="registration_title">New Member Registration</string>
+    <string name="registration_subtitle">Please provide your details to apply for church membership.</string>
+    <string name="full_name">Full Name</string>
+    <string name="email_optional">Email (Optional)</string>
+    <string name="address_optional">Residential Address</string>
+    <string name="dob_optional">Date of Birth (DD/MM/YYYY)</string>
+    <string name="gender_optional">Gender (Optional)</string>
+    <string name="submit_application">Submit Application</string>
+    <string name="name_required_error">Full name is required</string>
+
+    <!-- Account Status Screens -->
+    <string name="pending_approval_title">Application Under Review</string>
+    <string name="pending_approval_msg">Your membership application has been submitted and is currently awaiting review by the pastor or church admin. You will be notified once approved.</string>
+    <string name="check_status">Check Status</string>
+    <string name="contact_church">Contact Church Office</string>
+    <string name="suspended_title">Account Suspended</string>
+    <string name="suspended_msg">Your account has been temporarily deactivated. Please contact your church administration for assistance.</string>
+    <string name="rejected_title">Application Not Approved</string>
+    <string name="rejected_msg">Your application could not be verified. Please review your details or contact the church administrator.</string>
+    <string name="reapply">Update &amp; Re-apply</string>
+    
+    <!-- Role Titles -->
+    <string name="role_believer">Believer</string>
+    <string name="role_pastor">Pastor</string>
+    <string name="role_super_admin">Super Admin</string>
+
+    <!-- Believer Dashboard Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_bible">Bible</string>
+    <string name="nav_prayer">Prayer</string>
+    <string name="nav_events">Events</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Pastor Dashboard Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_members">Members</string>
+    <string name="nav_announcements">Notices</string>
+    <string name="nav_finance">Finance</string>
+    <string name="nav_more">More</string>
+
+    <!-- Super Admin Navigation -->
+    <string name="nav_overview">Overview</string>
+    <string name="nav_accounts">Accounts</string>
+    <string name="nav_churches">Churches</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Dashboard Content Placeholders -->
+    <string name="greeting_hello">Peace be with you,</string>
+    <string name="membership_id_label">Member ID: %1$s</string>
+    <string name="daily_verse_title">Verse of the Day</string>
+    <string name="sample_verse_ref">Philippians 4:13</string>
+    <string name="sample_verse_en">"I can do all things through Christ who strengthens me."</string>
+    <string name="sample_verse_ta">"என்னைப் பலப்படுத்துகிற கிறிஸ்துவினாலே எல்லாவற்றையும் செய்ய எனக்குப் பெலனுண்டு."</string>
+    <string name="announcements_title">Latest Announcements</string>
+    <string name="upcoming_events_title">Upcoming Events</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="action_prayer">Prayer Request</string>
+    <string name="action_offering">Offerings</string>
+    <string name="action_sermons">Sermons</string>
+    <string name="action_membership_card">Digital ID</string>
+    <string name="pastor_overview_title">Pastor Ministry Overview</string>
+    <string name="super_admin_title">Super Admin Command Center</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="switch_workspace_view">Workspace View</string>
+    <string name="retry">Retry</string>
+    <string name="loading">Loading, please wait...</string>
+    <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="church_name_default">GRACE AG</string>
+    <string name="settings_drawer_title">Settings &amp; Preferences</string>
+    <string name="push_alerts_title">Push Alerts &amp; Reminders</string>
+    <string name="daily_bible_verse_setting">Daily Bible Verse</string>
+    <string name="daily_verse_time_hint">Notification at 6:00 AM</string>
+    <string name="notices_alerts_setting">Notices &amp; Event Alerts</string>
+    <string name="notices_alerts_hint">Receive urgent church bulletins</string>
+    <string name="church_info_title">Church Information</string>
+    <string name="church_helpline">Helpline: +91 44 2456 7890</string>
+    <string name="church_service_timing">Sunday Divine Service: 09:00 AM</string>
+    
+    <!-- Care Cells & Fellowships -->
+    <string name="care_cells_title">Area Care Cells &amp; Fellowships</string>
+    <string name="care_cells_subtitle">Neighborhood cottage prayers, youth groups &amp; church wings</string>
+    <string name="tab_all_cells">All Groups</string>
+    <string name="tab_area_cells">Care Cells</string>
+    <string name="tab_youth">Youth CYA</string>
+    <string name="tab_sunday_school">Sunday School</string>
+    <string name="tab_womens">Women\'s Wing</string>
+    <string name="cell_leader">Cell Leader</string>
+    <string name="meeting_schedule">Meeting Schedule</string>
+    <string name="meeting_venue">Venue Address</string>
+    <string name="study_topic">Active Bible Study Series</string>
+    <string name="call_leader">Call Leader</string>
+    <string name="whatsapp_leader">WhatsApp</string>
+    <string name="get_directions">Map Directions</string>
+    <string name="active_members_count">%1$d Believers</string>
+
+    <!-- Pastoral Care Alerts -->
+    <string name="pastoral_care_title">Pastoral Care Alert Center</string>
+    <string name="pastoral_care_subtitle">Birthdays, wedding anniversaries &amp; visitation schedule</string>
+    <string name="today_celebrations">Today\'s Church Celebrations</string>
+    <string name="birthday_label">Birthday</string>
+    <string name="anniversary_label">Wedding Anniversary</string>
+    <string name="hospital_visit_label">Hospital Care Visit</string>
+    <string name="home_blessing_label">Home Dedication</string>
+    <string name="bereavement_label">Bereavement Comfort</string>
+    <string name="send_blessing_whatsapp">WhatsApp Blessing</string>
+    <string name="mark_as_prayed">Mark Prayed</string>
+    <string name="mark_as_visited">Mark Visited</string>
+    <string name="request_pastoral_visit">Request Pastoral Visit</string>
+    <string name="request_visit_subtitle">Schedule hospital communion, home dedication, or family prayer</string>
+    <string name="visit_type_prompt">Select Visit Category</string>
+    <string name="visit_location_prompt">Hospital Ward / Home Address</string>
+    <string name="visit_notes_prompt">Prayer intention &amp; specific needs</string>
+    <string name="submit_visit_request">Submit Visit Request</string>
+    <string name="request_submitted_toast">Pastoral visit request sent to church office</string>
+
+    <!-- Notifications, App Updater & Daily Bible Verse -->
+    <string name="notif_channel_notices_name">Church Notices &amp; Events</string>
+    <string name="notif_channel_notices_desc">Urgent church bulletins and upcoming service alerts</string>
+    <string name="notif_channel_verse_name">Daily Bible Verse</string>
+    <string name="notif_channel_verse_desc">Morning bilingual Bible verse and devotional at 6:00 AM</string>
+    <string name="notif_channel_account_name">Receipts &amp; Membership</string>
+    <string name="notif_channel_account_desc">Verified offering receipts and subscription updates</string>
+    <string name="update_available_title">New App Update Available</string>
+    <string name="update_download_now">Download Update</string>
+    <string name="update_later">Later</string>
+    <string name="daily_verse_manager_title">Daily Bible Verse &amp; Auto Rotation</string>
+    <string name="auto_verse_daily_title">Auto Verse Daily (6:00 AM)</string>
+    <string name="auto_verse_daily_desc">Automatically deliver a different bilingual scripture verse daily to all members.</string>
+    <string name="notification_center_title">Notification Center</string>
+    <string name="notification_center_subtitle">Daily verse reminders, church notices &amp; push alerts</string>
+    <string name="verse_badge_pinned">Pinned Today</string>
+    <string name="verse_badge_auto">Auto Daily</string>
+    <string name="verse_badge_pastor">Pastor Verse</string>
+</resources>

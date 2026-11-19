@@ -1,0 +1,104 @@
+name: Build & Release GRACE AG APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Signed APK & Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Accept Android SDK licenses
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
+          yes | "${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      - name: Restore project signing keystore
+        run: |
+          if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          if [ ! -f .env ] && [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+
+      - name: Read app version metadata
+        id: app_version
+        run: |
+          VERSION_CODE=$(grep -E '^\s*versionCode\s*=' app/build.gradle.kts | head -n 1 | sed -E 's/[^0-9]//g')
+          VERSION_NAME=$(grep -E '^\s*versionName\s*=' app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+          VERSION_CODE="${VERSION_CODE:-1}"
+          VERSION_NAME="${VERSION_NAME:-1.0}"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "apk_name=grace-ag-v${VERSION_NAME}.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Build GRACE AG APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Prepare versioned APK file
+        run: |
+          mkdir -p release-apk
+          cp app/build/outputs/apk/debug/app-debug.apk "release-apk/${{ steps.app_version.outputs.apk_name }}"
+
+      - name: Upload APK build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: grace-ag-v${{ steps.app_version.outputs.version_name }}-apk
+          path: release-apk/${{ steps.app_version.outputs.apk_name }}
+          retention-days: 90
+
+      - name: Publish or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.app_version.outputs.version_name }}"
+          APK_FILE="release-apk/${{ steps.app_version.outputs.apk_name }}"
+          TITLE="GRACE AG v${{ steps.app_version.outputs.version_name }} (Build ${{ steps.app_version.outputs.version_code }})"
+          NOTES="Automated Android APK build for GRACE AG v${{ steps.app_version.outputs.version_name }} (Version Code: ${{ steps.app_version.outputs.version_code }})."
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK_FILE" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
+          else
+            gh release create "$TAG" "$APK_FILE" --title "$TITLE" --notes "$NOTES"
+          fi
+
+      - name: Write direct download link to Job Summary
+        run: |
+          TAG="v${{ steps.app_version.outputs.version_name }}"
+          APK_NAME="${{ steps.app_version.outputs.apk_name }}"
+          DIRECT_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${APK_NAME}"
+          {
+            echo "## GRACE AG APK Ready!"
+            echo ""
+            echo "- **Version Code:** \`${{ steps.app_version.outputs.version_code }}\`"
+            echo "- **Version Name:** \`${{ steps.app_version.outputs.version_name }}\`"
+            echo "- **Direct APK Download URL (paste into Super Admin Updater):**"
+            echo ""
+            echo "\`\`\`"
+            echo "${DIRECT_URL}"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
