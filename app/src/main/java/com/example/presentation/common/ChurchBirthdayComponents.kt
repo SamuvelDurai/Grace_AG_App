@@ -2,13 +2,18 @@ package com.example.presentation.common
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -47,8 +52,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -130,62 +139,124 @@ fun ChurchFamilyBirthdayWishesCard(
   Card(
     modifier = modifier
       .fillMaxWidth()
+      .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
       .testTag("church_family_birthday_wishes_card"),
     shape = RoundedCornerShape(18.dp),
     colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     border = BorderStroke(1.5.dp, if (todayList.isNotEmpty()) AccentAmber else SoftBlueBorder)
   ) {
-    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+    Column {
+      if (todayList.isNotEmpty()) {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(84.dp)
+        ) {
+          Image(
+            painter = painterResource(id = R.drawable.img_church_celebration),
+            contentDescription = stringResource(id = R.string.church_family_birthdays_title),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+          )
           Box(
             modifier = Modifier
-              .size(36.dp)
-              .clip(CircleShape)
-              .background(SoftAmberContainer),
-            contentAlignment = Alignment.Center
-          ) {
-            Icon(
-              imageVector = Icons.Default.Cake,
-              contentDescription = null,
-              tint = AccentAmber,
-              modifier = Modifier.size(20.dp)
-            )
-          }
-          Spacer(modifier = Modifier.width(10.dp))
-          Column {
-            Text(
-              text = stringResource(id = R.string.church_family_birthdays_title),
-              style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = TextDeepNavy
+              .fillMaxSize()
+              .background(
+                Brush.horizontalGradient(
+                  colors = listOf(
+                    DeepRoyalNavy.copy(alpha = 0.88f),
+                    DeepRoyalNavy.copy(alpha = 0.52f)
+                  )
+                )
               )
-            )
-            Text(
-              text = if (todayList.isNotEmpty()) {
-                stringResource(id = R.string.church_family_birthdays_today_subtitle)
-              } else {
-                stringResource(id = R.string.church_family_birthdays_week_subtitle)
-              },
-              style = MaterialTheme.typography.labelSmall.copy(color = TextSlate)
-            )
+          )
+          Row(
+            modifier = Modifier
+              .fillMaxSize()
+              .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+              Box(
+                modifier = Modifier
+                  .size(38.dp)
+                  .clip(CircleShape)
+                  .background(AccentAmber.copy(alpha = 0.25f)),
+                contentAlignment = Alignment.Center
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Cake,
+                  contentDescription = null,
+                  tint = AccentAmber,
+                  modifier = Modifier.size(22.dp)
+                )
+              }
+              Spacer(modifier = Modifier.width(10.dp))
+              Column {
+                Text(
+                  text = stringResource(id = R.string.church_family_birthdays_title),
+                  style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = TextWhite
+                  )
+                )
+                Text(
+                  text = stringResource(id = R.string.church_family_birthdays_today_subtitle),
+                  style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(alpha = 0.88f))
+                )
+              }
+            }
+            Surface(shape = RoundedCornerShape(12.dp), color = AccentAmber) {
+              Text(
+                text = "${todayList.size} Today",
+                style = MaterialTheme.typography.labelSmall.copy(
+                  color = TextWhite,
+                  fontWeight = FontWeight.Bold
+                ),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+              )
+            }
           }
         }
-        if (todayList.isNotEmpty()) {
-          Surface(shape = RoundedCornerShape(12.dp), color = AccentAmber) {
-            Text(
-              text = "${todayList.size} Today",
-              style = MaterialTheme.typography.labelSmall.copy(
-                color = TextWhite,
-                fontWeight = FontWeight.Bold
-              ),
-              modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-            )
+      }
+      Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+      if (todayList.isEmpty()) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Box(
+              modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(SoftAmberContainer),
+              contentAlignment = Alignment.Center
+            ) {
+              Icon(
+                imageVector = Icons.Default.Cake,
+                contentDescription = null,
+                tint = AccentAmber,
+                modifier = Modifier.size(20.dp)
+              )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+              Text(
+                text = stringResource(id = R.string.church_family_birthdays_title),
+                style = MaterialTheme.typography.titleMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = TextDeepNavy
+                )
+              )
+              Text(
+                text = stringResource(id = R.string.church_family_birthdays_week_subtitle),
+                style = MaterialTheme.typography.labelSmall.copy(color = TextSlate)
+              )
+            }
           }
         }
       }
@@ -226,7 +297,7 @@ fun ChurchFamilyBirthdayWishesCard(
                   text = if (isAnniversary) "💍 ${celebration.memberName}" else "🎂 ${celebration.memberName}",
                   style = MaterialTheme.typography.titleSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    color = DeepRoyalNavy
+                    color = TextDeepNavy
                   )
                 )
                 Text(
@@ -354,6 +425,7 @@ fun ChurchFamilyBirthdayWishesCard(
         }
       }
     }
+    }
   }
 }
 
@@ -426,6 +498,7 @@ fun WeeklyBirthdayReminderCard(
   Card(
     modifier = modifier
       .fillMaxWidth()
+      .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
       .testTag("weekly_birthday_reminder_card"),
     shape = RoundedCornerShape(18.dp),
     colors = CardDefaults.cardColors(containerColor = SurfaceWhite),

@@ -57,10 +57,16 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -75,8 +81,10 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.util.PhoneNumberHelper
 import com.example.core.util.findActivity
+import com.example.presentation.common.AnimatedEntranceItem
 import com.example.ui.theme.ClassicChurchBlue
 import com.example.ui.theme.CleanBackground
+import com.example.ui.theme.DeepRoyalNavy
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.ErrorRedContainer
 import com.example.ui.theme.SoftBlueBorder
@@ -85,6 +93,7 @@ import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.SuccessGreenContainer
 import com.example.ui.theme.SurfaceWhite
 import com.example.ui.theme.TextDeepNavy
+import com.example.ui.theme.TextIceBlue
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextSlate
 import com.example.ui.theme.TextWhite
@@ -150,64 +159,105 @@ fun PhoneLoginScreen(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.Top
     ) {
-      Spacer(modifier = Modifier.height(10.dp))
-
-      Box(
-        modifier = Modifier
-          .size(84.dp)
-          .clip(CircleShape)
-          .background(SoftBlueContainer),
-        contentAlignment = Alignment.Center
-      ) {
-        Box(
-          modifier = Modifier
-            .size(68.dp)
-            .clip(CircleShape)
-            .background(SurfaceWhite),
-          contentAlignment = Alignment.Center
+      // Sanctuary Hero Header Card
+      AnimatedEntranceItem(index = 0) {
+        Card(
+          modifier = Modifier.fillMaxWidth(),
+          shape = RoundedCornerShape(22.dp),
+          colors = CardDefaults.cardColors(containerColor = DeepRoyalNavy),
+          elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
-          Image(
-            painter = painterResource(id = R.drawable.ic_church_logo),
-            contentDescription = null,
+          Box(
             modifier = Modifier
-              .size(56.dp)
-              .clip(CircleShape)
-          )
+              .fillMaxWidth()
+              .height(176.dp)
+          ) {
+            Image(
+              painter = painterResource(id = R.drawable.img_sanctuary_hero),
+              contentDescription = stringResource(id = R.string.app_name),
+              contentScale = ContentScale.Crop,
+              modifier = Modifier.fillMaxSize()
+            )
+            Box(
+              modifier = Modifier
+                .fillMaxSize()
+                .background(
+                  Brush.verticalGradient(
+                    colorStops = arrayOf(
+                      0.0f to DeepRoyalNavy.copy(alpha = 0.30f),
+                      0.50f to DeepRoyalNavy.copy(alpha = 0.72f),
+                      1.0f to DeepRoyalNavy.copy(alpha = 0.94f)
+                    )
+                  )
+                )
+            )
+            Column(
+              modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+              horizontalAlignment = Alignment.CenterHorizontally,
+              verticalArrangement = Arrangement.Center
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(66.dp)
+                  .clip(CircleShape)
+                  .background(Color.White.copy(alpha = 0.22f)),
+                contentAlignment = Alignment.Center
+              ) {
+                Box(
+                  modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+                  contentAlignment = Alignment.Center
+                ) {
+                  Image(
+                    painter = painterResource(id = R.drawable.ic_church_logo),
+                    contentDescription = null,
+                    modifier = Modifier
+                      .size(46.dp)
+                      .clip(CircleShape)
+                  )
+                }
+              }
+
+              Spacer(modifier = Modifier.height(10.dp))
+
+              Text(
+                text = if (isSignUpMode) {
+                  stringResource(id = R.string.believer_signup_title)
+                } else {
+                  stringResource(id = R.string.auth_signin_title)
+                },
+                style = MaterialTheme.typography.titleLarge.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = TextWhite,
+                  fontSize = 21.sp
+                ),
+                textAlign = TextAlign.Center
+              )
+
+              Spacer(modifier = Modifier.height(4.dp))
+
+              Text(
+                text = if (isSignUpMode) {
+                  stringResource(id = R.string.believer_signup_subtitle)
+                } else {
+                  stringResource(id = R.string.auth_signin_subtitle)
+                },
+                style = MaterialTheme.typography.bodySmall.copy(
+                  color = TextIceBlue,
+                  lineHeight = 18.sp
+                ),
+                textAlign = TextAlign.Center
+              )
+            }
+          }
         }
       }
 
-      Spacer(modifier = Modifier.height(14.dp))
-
-      Text(
-        text = if (isSignUpMode) {
-          stringResource(id = R.string.believer_signup_title)
-        } else {
-          stringResource(id = R.string.auth_signin_title)
-        },
-        style = MaterialTheme.typography.headlineSmall.copy(
-          fontWeight = FontWeight.Bold,
-          color = TextDeepNavy,
-          fontSize = 24.sp
-        ),
-        textAlign = TextAlign.Center
-      )
-
-      Spacer(modifier = Modifier.height(6.dp))
-
-      Text(
-        text = if (isSignUpMode) {
-          stringResource(id = R.string.believer_signup_subtitle)
-        } else {
-          stringResource(id = R.string.auth_signin_subtitle)
-        },
-        style = MaterialTheme.typography.bodyMedium.copy(
-          color = TextSlate,
-          lineHeight = 20.sp
-        ),
-        textAlign = TextAlign.Center
-      )
-
-      Spacer(modifier = Modifier.height(18.dp))
+      Spacer(modifier = Modifier.height(16.dp))
 
       // Mode Toggle: Sign In vs Believer Sign Up
       Surface(
@@ -312,14 +362,22 @@ fun PhoneLoginScreen(
       }
 
       // Card 1: Email & Password Sign-In / Believer Sign-Up
-      Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(1.dp, SoftBlueBorder)
-      ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+      AnimatedEntranceItem(index = 1) {
+        Card(
+          modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(
+              animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMediumLow
+              )
+            ),
+          shape = RoundedCornerShape(18.dp),
+          colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+          elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+          border = BorderStroke(1.dp, SoftBlueBorder)
+        ) {
+          Column(modifier = Modifier.padding(20.dp)) {
           Text(
             text = if (isSignUpMode) {
               "New Believer Account (Email & Password)"
@@ -454,8 +512,8 @@ fun PhoneLoginScreen(
             colors = ButtonDefaults.buttonColors(
               containerColor = ClassicChurchBlue,
               contentColor = TextWhite,
-              disabledContainerColor = Color(0xFFB0C7E8),
-              disabledContentColor = Color.White
+              disabledContainerColor = ClassicChurchBlue.copy(alpha = 0.38f),
+              disabledContentColor = TextWhite.copy(alpha = 0.72f)
             )
           ) {
             if (isEmailLoading) {
@@ -479,6 +537,7 @@ fun PhoneLoginScreen(
             }
           }
         }
+      }
       }
 
       Spacer(modifier = Modifier.height(18.dp))
@@ -636,8 +695,8 @@ fun PhoneLoginScreen(
             colors = ButtonDefaults.buttonColors(
               containerColor = ClassicChurchBlue,
               contentColor = TextWhite,
-              disabledContainerColor = Color(0xFFB0C7E8),
-              disabledContentColor = Color.White
+              disabledContainerColor = ClassicChurchBlue.copy(alpha = 0.38f),
+              disabledContentColor = TextWhite.copy(alpha = 0.72f)
             )
           ) {
             if (isPhoneLoading) {

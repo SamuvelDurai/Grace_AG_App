@@ -1,7 +1,15 @@
 package com.example.presentation.auth
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,10 +22,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -25,6 +37,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -37,8 +50,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -47,6 +63,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.core.util.ProfilePhotoHelper
+import com.example.presentation.common.MemberAvatar
 import com.example.ui.theme.ClassicChurchBlue
 import com.example.ui.theme.CleanBackground
 import com.example.ui.theme.ErrorRed
@@ -57,6 +75,9 @@ import com.example.ui.theme.TextDeepNavy
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextSlate
 import com.example.ui.theme.TextWhite
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun NewBelieverRegistrationScreen(
@@ -93,6 +114,29 @@ fun NewBelieverRegistrationScreen(
   var familyMembers by remember { mutableStateOf<List<com.example.core.model.FamilyMemberEntry>>(emptyList()) }
   var ministryGroup by remember { mutableStateOf("") }
 
+  val coroutineScope = rememberCoroutineScope()
+  var selectedPhotoUri by remember { mutableStateOf(currentProfile?.photoUrl.orEmpty()) }
+  var isEncodingPhoto by remember { mutableStateOf(false) }
+
+  val photoPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickVisualMedia()
+  ) { uri: Uri? ->
+    uri?.let { pickedUri ->
+      isEncodingPhoto = true
+      coroutineScope.launch {
+        val compressed = withContext(Dispatchers.IO) {
+          ProfilePhotoHelper.encodeUriToCompressedDataUri(context, pickedUri)
+        }
+        isEncodingPhoto = false
+        if (compressed != null) {
+          selectedPhotoUri = compressed
+        } else {
+          Toast.makeText(context, "Unable to read selected image. Please try another photo.", Toast.LENGTH_SHORT).show()
+        }
+      }
+    }
+  }
+
   var validationError by remember { mutableStateOf<String?>(null) }
 
   LaunchedEffect(currentProfile?.uid) {
@@ -104,6 +148,9 @@ fun NewBelieverRegistrationScreen(
     }
     if (email.isBlank() && !currentProfile?.email.isNullOrBlank()) {
       email = currentProfile!!.email
+    }
+    if (selectedPhotoUri.isBlank() && !currentProfile?.photoUrl.isNullOrBlank()) {
+      selectedPhotoUri = currentProfile!!.photoUrl
     }
   }
 
@@ -193,6 +240,62 @@ fun NewBelieverRegistrationScreen(
               color = TextDeepNavy
             )
           )
+
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clickable(enabled = !isEncodingPhoto) {
+                photoPickerLauncher.launch(
+                  PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+              }
+              .padding(vertical = 4.dp)
+              .testTag("reg_photo_picker"),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+              MemberAvatar(
+                photoUrl = selectedPhotoUri,
+                displayName = fullName.ifBlank { "Member" },
+                size = 64.dp
+              )
+              if (isEncodingPhoto) {
+                CircularProgressIndicator(
+                  color = ClassicChurchBlue,
+                  strokeWidth = 2.5.dp,
+                  modifier = Modifier.size(64.dp)
+                )
+              }
+              Box(
+                modifier = Modifier
+                  .size(24.dp)
+                  .clip(CircleShape)
+                  .background(ClassicChurchBlue),
+                contentAlignment = Alignment.Center
+              ) {
+                Icon(
+                  imageVector = Icons.Default.CameraAlt,
+                  contentDescription = "Upload Profile Photo",
+                  tint = TextWhite,
+                  modifier = Modifier.size(13.dp)
+                )
+              }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = if (selectedPhotoUri.isNotBlank()) "Profile Photo Ready" else "Add Profile Photo (Optional)",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = TextDeepNavy
+                )
+              )
+              Text(
+                text = if (isEncodingPhoto) "Processing photo..." else "Tap to choose your photo for Church Directory & Digital ID",
+                style = MaterialTheme.typography.bodySmall.copy(color = TextSlate)
+              )
+            }
+          }
 
           OutlinedTextField(
             value = fullName,
@@ -488,6 +591,7 @@ fun NewBelieverRegistrationScreen(
                 familyName = familyName,
                 familyMembers = familyMembers,
                 ministryGroup = ministryGroup,
+                profilePhotoUrl = selectedPhotoUri,
                 onComplete = onRegistrationSubmitted
               )
             }

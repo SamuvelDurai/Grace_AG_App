@@ -1,6 +1,8 @@
 package com.example
 
 import com.example.core.model.ChurchCelebration
+import com.example.core.theme.AppThemeMode
+import com.example.core.util.ProfilePhotoHelper
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.Calendar
@@ -12,6 +14,32 @@ class ExampleUnitTest {
   @Test
   fun addition_isCorrect() {
     assertEquals(4, 2 + 2)
+  }
+
+  @Test
+  fun appThemeMode_parsesStoredPreferencesSafely() {
+    assertEquals(AppThemeMode.SYSTEM, AppThemeMode.fromPref(null))
+    assertEquals(AppThemeMode.SYSTEM, AppThemeMode.fromPref("system"))
+    assertEquals(AppThemeMode.LIGHT, AppThemeMode.fromPref("light"))
+    assertEquals(AppThemeMode.DARK, AppThemeMode.fromPref("dark"))
+    assertEquals(AppThemeMode.SYSTEM, AppThemeMode.fromPref("unknown_value"))
+  }
+
+  @Test
+  fun profilePhotoHelper_validatesAndResolvesCrossDeviceUrls() {
+    val sampleDataUri = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+    val sampleHttps = "https://lh3.googleusercontent.com/a/example"
+    val localContentUri = "content://media/picker/0/com.android.providers.media.photopicker/media/42"
+
+    assertTrue(ProfilePhotoHelper.isCrossDevicePhotoUrl(sampleDataUri))
+    assertTrue(ProfilePhotoHelper.isCrossDevicePhotoUrl(sampleHttps))
+    assertFalse(ProfilePhotoHelper.isCrossDevicePhotoUrl(localContentUri))
+    assertFalse(ProfilePhotoHelper.isCrossDevicePhotoUrl(""))
+    assertFalse(ProfilePhotoHelper.isCrossDevicePhotoUrl(null))
+
+    assertEquals(sampleDataUri, ProfilePhotoHelper.resolvePhotoUrl(localContentUri, sampleDataUri, sampleHttps))
+    assertEquals(sampleHttps, ProfilePhotoHelper.resolvePhotoUrl("", localContentUri, sampleHttps))
+    assertEquals("", ProfilePhotoHelper.resolvePhotoUrl("", localContentUri, null))
   }
 
   @Test

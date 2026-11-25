@@ -216,8 +216,8 @@ fun OtpVerificationScreen(
             colors = ButtonDefaults.buttonColors(
               containerColor = ClassicChurchBlue,
               contentColor = TextWhite,
-              disabledContainerColor = Color(0xFFB0C7E8),
-              disabledContentColor = Color.White
+              disabledContainerColor = ClassicChurchBlue.copy(alpha = 0.38f),
+              disabledContentColor = TextWhite.copy(alpha = 0.72f)
             ),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
           ) {

@@ -95,8 +95,11 @@ import com.example.data.prayer.PrayerRepository
 import com.example.data.sermon.SermonRepository
 import com.example.presentation.announcement.PastorAnnouncementsScreen
 import com.example.presentation.auth.AuthViewModel
+import com.example.presentation.common.AnimatedEntranceItem
+import com.example.presentation.common.ChurchPageHeroBanner
 import com.example.presentation.common.ChurchSettingsDrawerContent
 import com.example.presentation.common.NotificationCenterDialog
+import com.example.presentation.common.SmoothTabContent
 import com.example.presentation.common.WeeklyBirthdayReminderCard
 import com.example.presentation.finance.PastorFinanceScreen
 import com.example.presentation.member.PastorMembersScreen
@@ -355,66 +358,73 @@ fun PastorDashboardScreen(
         .fillMaxSize()
         .padding(paddingValues)
     ) {
-      when (selectedTab) {
-        0 -> PastorHomeTab(
-          memberRepository = memberRepository,
-          prayerRepository = prayerRepository,
-          pastoralCareRepository = pastoralCareRepository,
-          bibleContentRepository = bibleContentRepository,
-          churchCelebrations = churchCelebrations,
-          churchId = churchId,
-          currentUid = userProfile.uid,
-          pastorName = userProfile.displayName.ifBlank { "Senior Pastor" },
-          currentLanguage = currentLanguage,
-          onNavigateToMembers = { selectedTab = 1 },
-          onNavigateToPrayers = {
-            initialMinistryTab = 0
-            selectedTab = 4
-          },
-          onNavigateToCareAlerts = {
-            initialMinistryTab = 1
-            selectedTab = 4
-          },
-          onNavigateToCareCells = {
-            initialMinistryTab = 2
-            selectedTab = 4
-          },
-          onNavigateToEvents = {
-            initialMinistryTab = 3
-            selectedTab = 4
-          },
-          onNavigateToDailyVerse = {
-            initialMinistryTab = 5
-            selectedTab = 4
-          }
-        )
-        1 -> PastorMembersScreen(
-          memberRepository = memberRepository,
-          currentPastorUid = userProfile.uid
-        )
-        2 -> PastorAnnouncementsScreen(
-          announcementRepository = announcementRepository,
-          pastorName = userProfile.displayName.ifBlank { "Senior Pastor" }
-        )
-        3 -> PastorFinanceScreen(
-          financeRepository = financeRepository,
-          memberRepository = memberRepository,
-          churchAdminRepository = churchAdminRepository
-        )
-        4 -> PastorMinistryScreen(
-          prayerRepository = prayerRepository,
-          churchEventRepository = churchEventRepository,
-          sermonRepository = sermonRepository,
-          fellowshipRepository = fellowshipRepository,
-          pastoralCareRepository = pastoralCareRepository,
-          memberRepository = memberRepository,
-          bibleContentRepository = bibleContentRepository,
-          churchId = churchId,
-          currentLanguage = currentLanguage,
-          viewModel = viewModel,
-          initialTab = initialMinistryTab,
-          pastorName = userProfile.displayName.ifBlank { "Senior Pastor" }
-        )
+      SmoothTabContent(
+        targetState = selectedTab,
+        label = "pastor_tabs"
+      ) { tab ->
+        when (tab) {
+          0 -> PastorHomeTab(
+            memberRepository = memberRepository,
+            prayerRepository = prayerRepository,
+            pastoralCareRepository = pastoralCareRepository,
+            bibleContentRepository = bibleContentRepository,
+            churchCelebrations = churchCelebrations,
+            churchId = churchId,
+            currentUid = userProfile.uid,
+            pastorName = userProfile.displayName.ifBlank { "Senior Pastor" },
+            currentLanguage = currentLanguage,
+            onNavigateToMembers = { selectedTab = 1 },
+            onNavigateToPrayers = {
+              initialMinistryTab = 0
+              selectedTab = 4
+            },
+            onNavigateToCareAlerts = {
+              initialMinistryTab = 1
+              selectedTab = 4
+            },
+            onNavigateToCareCells = {
+              initialMinistryTab = 2
+              selectedTab = 4
+            },
+            onNavigateToEvents = {
+              initialMinistryTab = 3
+              selectedTab = 4
+            },
+            onNavigateToDailyVerse = {
+              initialMinistryTab = 5
+              selectedTab = 4
+            }
+          )
+          1 -> PastorMembersScreen(
+            memberRepository = memberRepository,
+            currentPastorUid = userProfile.uid,
+            churchId = churchId,
+            churchAdminRepository = churchAdminRepository
+          )
+          2 -> PastorAnnouncementsScreen(
+            announcementRepository = announcementRepository,
+            pastorName = userProfile.displayName.ifBlank { "Senior Pastor" }
+          )
+          3 -> PastorFinanceScreen(
+            financeRepository = financeRepository,
+            memberRepository = memberRepository,
+            churchAdminRepository = churchAdminRepository
+          )
+          4 -> PastorMinistryScreen(
+            prayerRepository = prayerRepository,
+            churchEventRepository = churchEventRepository,
+            sermonRepository = sermonRepository,
+            fellowshipRepository = fellowshipRepository,
+            pastoralCareRepository = pastoralCareRepository,
+            memberRepository = memberRepository,
+            bibleContentRepository = bibleContentRepository,
+            churchId = churchId,
+            currentLanguage = currentLanguage,
+            viewModel = viewModel,
+            initialTab = initialMinistryTab,
+            pastorName = userProfile.displayName.ifBlank { "Senior Pastor" }
+          )
+        }
       }
     }
   }
@@ -459,16 +469,37 @@ private fun PastorHomeTab(
     contentPadding = PaddingValues(16.dp),
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
+    // Pastor Ministry Desk Sanctuary Banner
+    item {
+      AnimatedEntranceItem(index = 0) {
+        ChurchPageHeroBanner(
+          imageRes = R.drawable.img_sanctuary_hero,
+          badgeText = stringResource(id = R.string.pastor_overview_title),
+          badgeIcon = Icons.Default.Dashboard,
+          title = pastorName,
+          subtitle = if (isTamil) {
+            "${members.size} உறுப்பினர்கள் • ${prayers.size} ஜெப விண்ணப்பங்கள் • ${pendingApps.size} நிலுவையில்"
+          } else {
+            "${members.size} Members • ${prayers.size} Prayer Requests • ${pendingApps.size} Pending"
+          },
+          height = 152.dp,
+          contentDescription = stringResource(id = R.string.pastor_overview_title)
+        )
+      }
+    }
+
     // Weekly Church Birthday Reminder (Next 7 Days) for Pastor
     item {
-      WeeklyBirthdayReminderCard(
-        celebrations = churchCelebrations,
-        churchId = churchId,
-        currentUid = currentUid,
-        actorName = pastorName,
-        currentLanguage = currentLanguage,
-        celebrationRepository = memberRepository.celebrationRepository
-      )
+      AnimatedEntranceItem(index = 1) {
+        WeeklyBirthdayReminderCard(
+          celebrations = churchCelebrations,
+          churchId = churchId,
+          currentUid = currentUid,
+          actorName = pastorName,
+          currentLanguage = currentLanguage,
+          celebrationRepository = memberRepository.celebrationRepository
+        )
+      }
     }
 
     // Morning Pastoral Care Alert Card

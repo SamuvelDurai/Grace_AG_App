@@ -135,7 +135,7 @@ fun AccountSuspendedScreen(
           .height(50.dp)
           .testTag("sign_out_button"),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Color(0xFFEF9A9A)),
+        border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.45f)),
         colors = ButtonDefaults.outlinedButtonColors(
           containerColor = SurfaceWhite,
           contentColor = ErrorRed

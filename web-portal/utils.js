@@ -14,16 +14,28 @@ export function initials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function renderAvatar(name, photoUrl) {
-  const cleanUrl = String(photoUrl || "").trim();
-  const isSafeUrl =
-    cleanUrl.startsWith("https://") ||
-    cleanUrl.startsWith("http://") ||
-    cleanUrl.startsWith("data:image/");
-  if (isSafeUrl) {
-    return `<div class="avatar-circle"><img src="${esc(cleanUrl)}" alt="${esc(name)}" /></div>`;
+export function resolvePhotoUrl(...candidates) {
+  for (const candidate of candidates) {
+    const clean = String(candidate || "").trim();
+    if (
+      clean.startsWith("data:image/") ||
+      clean.startsWith("https://") ||
+      clean.startsWith("http://")
+    ) {
+      return clean;
+    }
   }
-  return `<div class="avatar-circle">${esc(initials(name))}</div>`;
+  return "";
+}
+
+export function renderAvatar(name, photoUrl, previewUid = "") {
+  const cleanUrl = resolvePhotoUrl(photoUrl);
+  const label = esc(initials(name));
+  const dataAttr = previewUid ? ` data-preview-photo-uid="${esc(previewUid)}" style="cursor:pointer;" title="Click to view photo"` : "";
+  if (cleanUrl) {
+    return `<div class="avatar-circle"${dataAttr}><img src="${esc(cleanUrl)}" alt="${esc(name)}" onerror="this.parentElement.textContent='${label}'" /></div>`;
+  }
+  return `<div class="avatar-circle"${dataAttr}>${label}</div>`;
 }
 
 export function formatCurrency(amount) {

@@ -3,6 +3,9 @@ package com.example.presentation.member
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -72,10 +75,14 @@ import androidx.compose.ui.unit.sp
 import com.example.core.model.BelieverMember
 import com.example.core.model.FamilyMemberEntry
 import com.example.core.model.MembershipApplication
+import com.example.core.model.UserProfile
 import com.example.core.util.CsvExportHelper
+import com.example.core.util.ProfilePhotoHelper
 import com.example.core.util.launchActivitySafely
+import com.example.data.admin.ChurchAdminRepository
 import com.example.data.member.MemberRepository
 import com.example.presentation.common.MemberAvatar
+import com.example.presentation.common.MemberPhotoPreviewDialog
 import com.example.ui.theme.ClassicChurchBlue
 import com.example.ui.theme.CleanBackground
 import com.example.ui.theme.ErrorRed
@@ -88,29 +95,112 @@ import com.example.ui.theme.SurfaceWhite
 import com.example.ui.theme.TextDeepNavy
 import com.example.ui.theme.TextSlate
 import com.example.ui.theme.TextWhite
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun PastorMembersScreen(
   memberRepository: MemberRepository,
   currentPastorUid: String,
+  churchId: String = "church_main",
+  churchAdminRepository: ChurchAdminRepository? = null,
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
   val coroutineScope = rememberCoroutineScope()
-  val members by memberRepository.observeAllMembers().collectAsState(initial = emptyList())
-  val allFamilies by memberRepository.familyRepository.observeAllFamilies().collectAsState(initial = emptyList())
-  val pendingApplications by memberRepository.observePendingApplications().collectAsState(initial = emptyList())
+  val resolvedChurchId = churchId.ifBlank { "church_main" }
+  val members by memberRepository.observeAllMembers(resolvedChurchId).collectAsState(initial = emptyList())
+  val managedUsers by remember(churchAdminRepository, resolvedChurchId) {
+    churchAdminRepository?.observeManagedUsers(resolvedChurchId) ?: flowOf(emptyList<UserProfile>())
+  }.collectAsState(initial = emptyList())
+  val allFamilies by memberRepository.familyRepository.observeAllFamilies(resolvedChurchId).collectAsState(initial = emptyList())
+  val pendingApplications by memberRepository.observePendingApplications(resolvedChurchId).collectAsState(initial = emptyList())
+
+  val userPhotoByUid = remember(managedUsers) {
+    managedUsers.associate { it.uid to it.photoUrl }
+  }
+  val memberPhotoByUid = remember(members, userPhotoByUid, pendingApplications) {
+    val map = mutableMapOf<String, String>()
+    managedUsers.forEach { u ->
+      val p = ProfilePhotoHelper.resolvePhotoUrl(u.photoUrl)
+      if (p.isNotBlank()) map[u.uid] = p
+    }
+    pendingApplications.forEach { app ->
+      val p = ProfilePhotoHelper.resolvePhotoUrl(app.profilePhotoUrl, map[app.uid])
+      if (p.isNotBlank()) map[app.uid] = p
+    }
+    members.forEach { m ->
+      val p = ProfilePhotoHelper.resolvePhotoUrl(m.profilePhotoUrl, map[m.uid])
+      if (p.isNotBlank()) map[m.uid] = p
+    }
+    map
+  }
 
   var searchQuery by remember { mutableStateOf("") }
   var selectedFilter by remember { mutableStateOf("ALL") } // ALL, PENDING, BAPTIZED
 
   var reviewingApplication by remember { mutableStateOf<MembershipApplication?>(null) }
   var selectedMemberDetail by remember { mutableStateOf<BelieverMember?>(null) }
+  var photoPreviewTarget by remember { mutableStateOf<BelieverMember?>(null) }
+  var isUploadingMemberPhoto by remember { mutableStateOf(false) }
   var rejectionNote by remember { mutableStateOf("") }
   var showRejectDialog by remember { mutableStateOf(false) }
 
   var isProcessingAppAction by remember { mutableStateOf(false) }
+
+  val pastorPhotoPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickVisualMedia()
+  ) { uri: Uri? ->
+    val target = photoPreviewTarget ?: selectedMemberDetail ?: return@rememberLauncherForActivityResult
+    uri?.let { pickedUri ->
+      isUploadingMemberPhoto = true
+      coroutineScope.launch {
+        val compressed = withContext(Dispatchers.IO) {
+          ProfilePhotoHelper.encodeUriToCompressedDataUri(context, pickedUri)
+        }
+        if (compressed != null) {
+          val res = memberRepository.updateMemberPhoto(target, compressed)
+          isUploadingMemberPhoto = false
+          res.onSuccess { savedPhoto ->
+            photoPreviewTarget = target.copy(profilePhotoUrl = savedPhoto)
+            if (selectedMemberDetail?.uid == target.uid) {
+              selectedMemberDetail = selectedMemberDetail?.copy(profilePhotoUrl = savedPhoto)
+            }
+            Toast.makeText(context, "Updated photo for ${target.fullName}", Toast.LENGTH_SHORT).show()
+          }.onFailure { err ->
+            Toast.makeText(context, err.localizedMessage ?: "Failed to save member photo", Toast.LENGTH_LONG).show()
+          }
+        } else {
+          isUploadingMemberPhoto = false
+          Toast.makeText(context, "Unable to read selected image.", Toast.LENGTH_SHORT).show()
+        }
+      }
+    }
+  }
+
+  if (photoPreviewTarget != null) {
+    val target = photoPreviewTarget!!
+    val latestMember = members.firstOrNull { it.uid == target.uid } ?: target
+    val resolvedPhoto = ProfilePhotoHelper.resolvePhotoUrl(
+      latestMember.profilePhotoUrl,
+      target.profilePhotoUrl,
+      memberPhotoByUid[target.uid]
+    )
+    MemberPhotoPreviewDialog(
+      photoUrl = resolvedPhoto,
+      displayName = latestMember.fullName,
+      subtitle = latestMember.membershipId.ifBlank { latestMember.phoneNumber },
+      isUploading = isUploadingMemberPhoto,
+      onChangePhoto = {
+        pastorPhotoPickerLauncher.launch(
+          PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
+      },
+      onDismiss = { if (!isUploadingMemberPhoto) photoPreviewTarget = null }
+    )
+  }
 
   // Application Review Dialog
   if (reviewingApplication != null) {
@@ -119,13 +209,28 @@ fun PastorMembersScreen(
       onDismissRequest = { if (!isProcessingAppAction) reviewingApplication = null },
       containerColor = SurfaceWhite,
       title = {
-        Text(
-          text = "Review Membership Application",
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.Bold,
-            color = TextDeepNavy
+        val appPhoto = ProfilePhotoHelper.resolvePhotoUrl(app.profilePhotoUrl, memberPhotoByUid[app.uid])
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          MemberAvatar(
+            photoUrl = appPhoto,
+            displayName = app.fullName,
+            size = 46.dp
           )
-        )
+          Spacer(modifier = Modifier.width(12.dp))
+          Column {
+            Text(
+              text = "Review Application",
+              style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = TextDeepNavy
+              )
+            )
+            Text(
+              text = app.fullName,
+              style = MaterialTheme.typography.labelMedium.copy(color = ClassicChurchBlue)
+            )
+          }
+        }
       },
       text = {
         Column(
@@ -373,16 +478,19 @@ fun PastorMembersScreen(
       onDismissRequest = { selectedMemberDetail = null },
       containerColor = SurfaceWhite,
       title = {
+        val detailPhoto = ProfilePhotoHelper.resolvePhotoUrl(m.profilePhotoUrl, memberPhotoByUid[m.uid])
         Row(verticalAlignment = Alignment.CenterVertically) {
           MemberAvatar(
-            photoUrl = m.profilePhotoUrl,
+            photoUrl = detailPhoto,
             displayName = m.fullName,
-            size = 48.dp
+            size = 52.dp,
+            onClick = { photoPreviewTarget = m.copy(profilePhotoUrl = detailPhoto) }
           )
           Spacer(modifier = Modifier.width(12.dp))
           Column {
             Text(m.fullName, fontWeight = FontWeight.Bold, color = TextDeepNavy)
             Text(m.membershipId, color = ClassicChurchBlue, style = MaterialTheme.typography.labelSmall)
+            Text("Tap photo to view / update", color = TextSlate, fontSize = 10.sp)
           }
         }
       },
@@ -428,7 +536,7 @@ fun PastorMembersScreen(
               verticalAlignment = Alignment.CenterVertically
             ) {
               MemberAvatar(
-                photoUrl = headMember?.profilePhotoUrl ?: m.profilePhotoUrl,
+                photoUrl = ProfilePhotoHelper.resolvePhotoUrl(headMember?.profilePhotoUrl, memberPhotoByUid[headUid], m.profilePhotoUrl),
                 displayName = headName,
                 size = 30.dp
               )
@@ -448,7 +556,11 @@ fun PastorMembersScreen(
 
           rosterEntries.forEach { fm ->
             val linkedProfile = members.firstOrNull { it.uid == fm.linkedUid }
-            val resolvedPhoto = linkedProfile?.profilePhotoUrl?.ifBlank { fm.profilePhotoUrl } ?: fm.profilePhotoUrl
+            val resolvedPhoto = ProfilePhotoHelper.resolvePhotoUrl(
+              linkedProfile?.profilePhotoUrl,
+              memberPhotoByUid[fm.linkedUid],
+              fm.profilePhotoUrl
+            )
             Surface(
               shape = RoundedCornerShape(8.dp),
               color = CleanBackground,
@@ -799,6 +911,7 @@ fun PastorMembersScreen(
           }
         }
         items(pendingApplications, key = { it.applicationId.ifBlank { it.uid } }) { app ->
+          val appPhoto = ProfilePhotoHelper.resolvePhotoUrl(app.profilePhotoUrl, memberPhotoByUid[app.uid])
           Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
@@ -813,6 +926,22 @@ fun PastorMembersScreen(
               horizontalArrangement = Arrangement.SpaceBetween,
               verticalAlignment = Alignment.CenterVertically
             ) {
+              MemberAvatar(
+                photoUrl = appPhoto,
+                displayName = app.fullName,
+                size = 46.dp,
+                onClick = {
+                  photoPreviewTarget = BelieverMember(
+                    memberId = "mem_${app.uid}",
+                    uid = app.uid,
+                    churchId = app.churchId.ifBlank { resolvedChurchId },
+                    fullName = app.fullName,
+                    phoneNumber = app.phoneNumber,
+                    profilePhotoUrl = appPhoto
+                  )
+                }
+              )
+              Spacer(modifier = Modifier.width(12.dp))
               Column(modifier = Modifier.weight(1f)) {
                 Text(app.fullName, fontWeight = FontWeight.Bold, color = TextDeepNavy, fontSize = 16.sp)
                 Text("Phone: ${app.phoneNumber}", color = TextSlate, fontSize = 13.sp)
@@ -880,10 +1009,15 @@ fun PastorMembersScreen(
                 .padding(16.dp),
               verticalAlignment = Alignment.CenterVertically
             ) {
+              val resolvedMemberPhoto = ProfilePhotoHelper.resolvePhotoUrl(
+                member.profilePhotoUrl,
+                memberPhotoByUid[member.uid]
+              )
               MemberAvatar(
-                photoUrl = member.profilePhotoUrl,
+                photoUrl = resolvedMemberPhoto,
                 displayName = member.fullName,
-                size = 46.dp
+                size = 48.dp,
+                onClick = { photoPreviewTarget = member.copy(profilePhotoUrl = resolvedMemberPhoto) }
               )
 
               Spacer(modifier = Modifier.width(14.dp))

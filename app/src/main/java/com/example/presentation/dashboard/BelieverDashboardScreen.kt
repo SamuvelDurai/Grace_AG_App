@@ -83,10 +83,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.example.presentation.common.AnimatedEntranceItem
 import com.example.presentation.common.ChurchFamilyBirthdayWishesCard
+import com.example.presentation.common.ChurchPageHeroBanner
 import com.example.presentation.common.ChurchSettingsDrawerContent
 import com.example.presentation.common.MemberAvatar
 import com.example.presentation.common.NotificationCenterDialog
+import com.example.presentation.common.SmoothTabContent
+import com.example.presentation.common.ThemeModeSelectorCard
+import com.example.presentation.common.rememberTactilePressScale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -101,7 +107,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -267,7 +275,8 @@ fun BelieverDashboardScreen(
     BelieverProfileDetailScreen(
       member = effectiveMember,
       memberRepository = memberRepository,
-      onNavigateBack = { isEditingProfile = false }
+      onNavigateBack = { isEditingProfile = false },
+      onPhotoUpdated = { viewModel.refreshProfile() }
     )
     return
   }
@@ -515,63 +524,68 @@ fun BelieverDashboardScreen(
         .fillMaxSize()
         .padding(paddingValues)
     ) {
-      when (selectedTab) {
-        0 -> BelieverHomeTab(
-          userProfile = userProfile,
-          member = effectiveMember,
-          churchId = churchId,
-          churchCelebrations = churchCelebrations,
-          memberRepository = memberRepository,
-          announcementRepository = announcementRepository,
-          financeRepository = financeRepository,
-          bibleContentRepository = bibleContentRepository,
-          pastoralCareRepository = pastoralCareRepository,
-          currentLanguage = currentLanguage,
-          onOpenDigitalCard = { showDigitalCard = true },
-          onOpenPrayerDialog = { showPrayerDialog = true },
-          onOpenOfferingDialog = { showOfferingDialog = true },
-          onOpenPastoralVisitDialog = { showPastoralVisitDialog = true },
-          onNavigateToSermons = {
-            initialEventsSubTab = 1
-            selectedTab = 3
-          },
-          onNavigateToCareCells = {
-            initialEventsSubTab = 2
-            selectedTab = 3
-          }
-        )
-        1 -> BelieverBibleTab(
-          churchId = churchId,
-          bibleContentRepository = bibleContentRepository,
-          currentLanguage = currentLanguage
-        )
-        2 -> BelieverPrayerTab(
-          uid = userProfile.uid,
-          prayerRepository = prayerRepository,
-          onOpenPrayerDialog = { showPrayerDialog = true },
-          onRequestPastoralVisit = { showPastoralVisitDialog = true }
-        )
-        3 -> BelieverEventsTab(
-          churchEventRepository = churchEventRepository,
-          sermonRepository = sermonRepository,
-          fellowshipRepository = fellowshipRepository,
-          currentLanguage = currentLanguage,
-          initialSubTab = initialEventsSubTab
-        )
-        4 -> BelieverProfileTab(
-          userProfile = userProfile,
-          member = effectiveMember,
-          observedFamily = observedFamily,
-          memberRepository = memberRepository,
-          financeRepository = financeRepository,
-          churchAdminRepository = churchAdminRepository,
-          viewModel = viewModel,
-          languageManager = languageManager,
-          currentLanguage = currentLanguage,
-          onOpenDigitalCard = { showDigitalCard = true },
-          onEditProfile = { isEditingProfile = true },
-          onOpenOfferingDialog = { showOfferingDialog = true }
-        )
+      SmoothTabContent(
+        targetState = selectedTab,
+        label = "believer_tabs"
+      ) { tab ->
+        when (tab) {
+          0 -> BelieverHomeTab(
+            userProfile = userProfile,
+            member = effectiveMember,
+            churchId = churchId,
+            churchCelebrations = churchCelebrations,
+            memberRepository = memberRepository,
+            announcementRepository = announcementRepository,
+            financeRepository = financeRepository,
+            bibleContentRepository = bibleContentRepository,
+            pastoralCareRepository = pastoralCareRepository,
+            currentLanguage = currentLanguage,
+            onOpenDigitalCard = { showDigitalCard = true },
+            onOpenPrayerDialog = { showPrayerDialog = true },
+            onOpenOfferingDialog = { showOfferingDialog = true },
+            onOpenPastoralVisitDialog = { showPastoralVisitDialog = true },
+            onNavigateToSermons = {
+              initialEventsSubTab = 1
+              selectedTab = 3
+            },
+            onNavigateToCareCells = {
+              initialEventsSubTab = 2
+              selectedTab = 3
+            }
+          )
+          1 -> BelieverBibleTab(
+            churchId = churchId,
+            bibleContentRepository = bibleContentRepository,
+            currentLanguage = currentLanguage
+          )
+          2 -> BelieverPrayerTab(
+            uid = userProfile.uid,
+            prayerRepository = prayerRepository,
+            onOpenPrayerDialog = { showPrayerDialog = true },
+            onRequestPastoralVisit = { showPastoralVisitDialog = true }
+          )
+          3 -> BelieverEventsTab(
+            churchEventRepository = churchEventRepository,
+            sermonRepository = sermonRepository,
+            fellowshipRepository = fellowshipRepository,
+            currentLanguage = currentLanguage,
+            initialSubTab = initialEventsSubTab
+          )
+          4 -> BelieverProfileTab(
+            userProfile = userProfile,
+            member = effectiveMember,
+            observedFamily = observedFamily,
+            memberRepository = memberRepository,
+            financeRepository = financeRepository,
+            churchAdminRepository = churchAdminRepository,
+            viewModel = viewModel,
+            languageManager = languageManager,
+            currentLanguage = currentLanguage,
+            onOpenDigitalCard = { showDigitalCard = true },
+            onEditProfile = { isEditingProfile = true },
+            onOpenOfferingDialog = { showOfferingDialog = true }
+          )
+        }
       }
     }
   }
@@ -614,80 +628,39 @@ private fun BelieverHomeTab(
     contentPadding = PaddingValues(16.dp),
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
-    // Greeting Hero Card (Rich Blue Gradient)
+    // Greeting Hero Card (Sanctuary Photo + Royal Navy Scrim)
     item {
-      Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
-      ) {
-        Box(
-          modifier = Modifier
-            .fillMaxWidth()
-            .background(
-              Brush.horizontalGradient(
-                colors = listOf(DeepRoyalNavy, ClassicChurchBlue)
-              )
-            )
-            .padding(22.dp)
-        ) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-          ) {
-            Column(modifier = Modifier.weight(1f)) {
-              Text(
-                text = stringResource(id = R.string.greeting_hello),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                  color = TextIceBlue,
-                  fontWeight = FontWeight.Medium
-                )
-              )
-              Spacer(modifier = Modifier.height(4.dp))
-              Text(
-                text = member.fullName.ifBlank { "Believer" },
-                style = MaterialTheme.typography.headlineSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                  color = TextWhite
-                )
-              )
-              Spacer(modifier = Modifier.height(12.dp))
-              Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = Color.White.copy(alpha = 0.2f)
-              ) {
-                Text(
-                  text = stringResource(id = R.string.membership_id_label, member.membershipId),
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite
-                  ),
-                  modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                )
-              }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
+      AnimatedEntranceItem(index = 0) {
+        ChurchPageHeroBanner(
+          imageRes = R.drawable.img_sanctuary_hero,
+          badgeText = stringResource(id = R.string.greeting_hello),
+          badgeIcon = Icons.Default.Star,
+          title = member.fullName.ifBlank { "Believer" },
+          subtitle = stringResource(id = R.string.membership_id_label, member.membershipId),
+          height = 164.dp,
+          contentDescription = stringResource(id = R.string.app_name),
+          trailingContent = {
             MemberAvatar(
               photoUrl = member.profilePhotoUrl,
               displayName = member.fullName.ifBlank { userProfile.displayName },
-              size = 58.dp
+              size = 62.dp
             )
           }
-        }
+        )
       }
     }
 
     // Church Family Birthday Wishes & This Week's Celebrations (Visible to ALL Members)
     item {
-      ChurchFamilyBirthdayWishesCard(
-        celebrations = churchCelebrations,
-        currentUid = userProfile.uid,
-        currentUserName = member.fullName.ifBlank { userProfile.displayName.ifBlank { "Church Member" } },
-        currentLanguage = currentLanguage,
-        celebrationRepository = memberRepository.celebrationRepository
-      )
+      AnimatedEntranceItem(index = 1) {
+        ChurchFamilyBirthdayWishesCard(
+          celebrations = churchCelebrations,
+          currentUid = userProfile.uid,
+          currentUserName = member.fullName.ifBlank { userProfile.displayName.ifBlank { "Church Member" } },
+          currentLanguage = currentLanguage,
+          celebrationRepository = memberRepository.celebrationRepository
+        )
+      }
     }
 
     // Daily Bible Verse Card (Always resolved via Pastor Pin / Auto Daily / Pastor Custom)
@@ -702,10 +675,11 @@ private fun BelieverHomeTab(
       } else {
         todayVerse.textEnglish
       }
-      Card(
-        modifier = Modifier
-          .fillMaxWidth()
-          .testTag("believer_home_daily_verse_card"),
+      AnimatedEntranceItem(index = 2) {
+        Card(
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("believer_home_daily_verse_card"),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -812,6 +786,7 @@ private fun BelieverHomeTab(
             )
           }
         }
+      }
       }
     }
 
@@ -1013,10 +988,16 @@ private fun QuickActionCard(
   modifier: Modifier = Modifier,
   onClick: () -> Unit = {}
 ) {
+  val interactionSource = remember { MutableInteractionSource() }
+  val pressScale = rememberTactilePressScale(interactionSource)
   Card(
     onClick = onClick,
-    modifier = modifier,
-    shape = RoundedCornerShape(14.dp),
+    interactionSource = interactionSource,
+    modifier = modifier.graphicsLayer {
+      scaleX = pressScale
+      scaleY = pressScale
+    },
+    shape = RoundedCornerShape(16.dp),
     colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     border = BorderStroke(1.dp, SoftBlueBorder)
@@ -1087,13 +1068,17 @@ private fun BelieverBibleTab(
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
     item {
-      Text(
-        text = stringResource(id = R.string.nav_bible) + " & Devotionals",
-        style = MaterialTheme.typography.headlineSmall.copy(
-          fontWeight = FontWeight.Bold,
-          color = TextDeepNavy
+      AnimatedEntranceItem(index = 0) {
+        ChurchPageHeroBanner(
+          imageRes = R.drawable.img_bible_devotion,
+          badgeText = sourceBadge,
+          badgeIcon = Icons.Default.AutoStories,
+          title = stringResource(id = R.string.nav_bible) + " & Devotionals",
+          subtitle = featuredVerse.bookReference,
+          height = 148.dp,
+          contentDescription = stringResource(id = R.string.nav_bible)
         )
-      )
+      }
     }
 
     // Highlighted Today's Featured Verse
@@ -1292,54 +1277,59 @@ private fun BelieverPrayerTab(
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
     item {
-      Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = stringResource(id = R.string.nav_prayer),
-              style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold,
-                color = TextDeepNavy
-              )
-            )
-            Text(
-              text = "Share burdens with church prayer team",
-              style = MaterialTheme.typography.bodySmall.copy(color = TextSlate)
-            )
-          }
+      AnimatedEntranceItem(index = 0) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+          ChurchPageHeroBanner(
+            imageRes = R.drawable.img_prayer_hands,
+            badgeText = "Church Prayer Altar",
+            badgeIcon = Icons.Default.Favorite,
+            title = stringResource(id = R.string.nav_prayer),
+            subtitle = "Share burdens with church prayer team",
+            height = 148.dp,
+            contentDescription = stringResource(id = R.string.nav_prayer)
+          )
 
-          Button(
-            onClick = onOpenPrayerDialog,
-            colors = ButtonDefaults.buttonColors(containerColor = ClassicChurchBlue),
-            shape = RoundedCornerShape(10.dp)
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
           ) {
-            Text("Request Prayer", color = TextWhite, fontWeight = FontWeight.Bold)
-          }
-        }
+            Button(
+              onClick = onOpenPrayerDialog,
+              colors = ButtonDefaults.buttonColors(containerColor = ClassicChurchBlue),
+              shape = RoundedCornerShape(12.dp),
+              modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+            ) {
+              Text("Request Prayer", color = TextWhite, fontWeight = FontWeight.Bold)
+            }
 
-        OutlinedButton(
-          onClick = onRequestPastoralVisit,
-          shape = RoundedCornerShape(12.dp),
-          border = BorderStroke(1.dp, ClassicChurchBlue),
-          colors = ButtonDefaults.outlinedButtonColors(containerColor = SoftBlueContainer),
-          modifier = Modifier.fillMaxWidth().testTag("prayer_tab_request_visit")
-        ) {
-          Icon(
-            imageVector = Icons.Default.LocalHospital,
-            contentDescription = null,
-            tint = ClassicChurchBlue,
-            modifier = Modifier.size(18.dp)
-          )
-          Spacer(modifier = Modifier.width(8.dp))
-          Text(
-            text = stringResource(id = R.string.request_pastoral_visit),
-            color = ClassicChurchBlue,
-            fontWeight = FontWeight.Bold
-          )
+            OutlinedButton(
+              onClick = onRequestPastoralVisit,
+              shape = RoundedCornerShape(12.dp),
+              border = BorderStroke(1.dp, ClassicChurchBlue),
+              colors = ButtonDefaults.outlinedButtonColors(containerColor = SoftBlueContainer),
+              modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .testTag("prayer_tab_request_visit")
+            ) {
+              Icon(
+                imageVector = Icons.Default.LocalHospital,
+                contentDescription = null,
+                tint = ClassicChurchBlue,
+                modifier = Modifier.size(16.dp)
+              )
+              Spacer(modifier = Modifier.width(6.dp))
+              Text(
+                text = stringResource(id = R.string.request_pastoral_visit),
+                color = ClassicChurchBlue,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
+            }
+          }
         }
       }
     }
@@ -1477,7 +1467,38 @@ private fun BelieverEventsTab(
       )
     }
 
-    when (activeTab) {
+    Box(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+      val bannerTitle = when (activeTab) {
+        1 -> "Sermons & Audio"
+        2 -> stringResource(id = R.string.tab_area_cells)
+        else -> "Church Events & Worship"
+      }
+      val bannerSubtitle = when (activeTab) {
+        1 -> "Messages, scripture notes & church teachings"
+        2 -> "Connect with area care cells and fellowship wings"
+        else -> "Gatherings, worship services & RSVP updates"
+      }
+      ChurchPageHeroBanner(
+        imageRes = R.drawable.img_worship_fellowship,
+        badgeText = "GRACE AG Fellowship",
+        badgeIcon = Icons.Default.CalendarMonth,
+        title = bannerTitle,
+        subtitle = bannerSubtitle,
+        height = 124.dp,
+        contentDescription = bannerTitle
+      )
+    }
+
+    SmoothTabContent(
+      targetState = activeTab,
+      label = "events_sub_tabs",
+      modifier = Modifier.weight(1f)
+    ) { currentSubTab ->
+    when (currentSubTab) {
       0 -> {
         LazyColumn(
           modifier = Modifier.fillMaxSize(),
@@ -1658,6 +1679,7 @@ private fun BelieverEventsTab(
         )
       }
     }
+    }
   }
 }
 
@@ -1781,13 +1803,25 @@ private fun BelieverProfileTab(
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
     item {
-      Text(
-        text = stringResource(id = R.string.nav_profile),
-        style = MaterialTheme.typography.headlineSmall.copy(
-          fontWeight = FontWeight.Bold,
-          color = TextDeepNavy
+      AnimatedEntranceItem(index = 0) {
+        ChurchPageHeroBanner(
+          imageRes = R.drawable.img_church_celebration,
+          badgeText = stringResource(id = R.string.nav_profile),
+          badgeIcon = Icons.Default.Badge,
+          title = member.fullName.ifBlank { userProfile.displayName.ifBlank { "Church Member" } },
+          subtitle = "$familyName • ${member.membershipId}",
+          height = 148.dp,
+          contentDescription = stringResource(id = R.string.nav_profile),
+          trailingContent = {
+            MemberAvatar(
+              photoUrl = member.profilePhotoUrl,
+              displayName = member.fullName.ifBlank { userProfile.displayName },
+              size = 62.dp,
+              onClick = onEditProfile
+            )
+          }
         )
-      )
+      }
     }
 
     item {
@@ -1806,7 +1840,8 @@ private fun BelieverProfileTab(
             MemberAvatar(
               photoUrl = member.profilePhotoUrl,
               displayName = member.fullName.ifBlank { userProfile.displayName },
-              size = 64.dp
+              size = 64.dp,
+              onClick = onEditProfile
             )
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -2720,6 +2755,11 @@ private fun BelieverProfileTab(
           }
         }
       }
+    }
+
+    // App Theme / Appearance Card (System Default / Light / Dark)
+    item {
+      ThemeModeSelectorCard()
     }
 
     // Language Toggle Card

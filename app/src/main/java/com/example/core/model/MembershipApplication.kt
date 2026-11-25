@@ -12,6 +12,7 @@ data class MembershipApplication(
   val uid: String = "",
   val churchId: String = "church_main",
   val fullName: String = "",
+  val profilePhotoUrl: String = "",
   val phoneNumber: String = "",
   val email: String = "",
   val dateOfBirth: String = "",

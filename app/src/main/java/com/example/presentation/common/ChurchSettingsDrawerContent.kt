@@ -55,9 +55,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -149,14 +151,29 @@ fun ChurchSettingsDrawerContent(
       Box(
         modifier = Modifier
           .fillMaxWidth()
-          .background(
-            Brush.verticalGradient(
-              colors = listOf(DeepRoyalNavy, ClassicChurchBlue)
-            )
-          )
-          .padding(20.dp)
+          .background(DeepRoyalNavy)
       ) {
-        Column {
+        Image(
+          painter = painterResource(id = R.drawable.img_sanctuary_hero),
+          contentDescription = null,
+          contentScale = ContentScale.Crop,
+          modifier = Modifier
+            .matchParentSize()
+            .alpha(0.32f)
+        )
+        Box(
+          modifier = Modifier
+            .matchParentSize()
+            .background(
+              Brush.verticalGradient(
+                colors = listOf(
+                  DeepRoyalNavy.copy(alpha = 0.72f),
+                  DeepRoyalNavy.copy(alpha = 0.94f)
+                )
+              )
+            )
+        )
+        Column(modifier = Modifier.padding(20.dp)) {
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -166,7 +183,7 @@ fun ChurchSettingsDrawerContent(
               modifier = Modifier
                 .size(46.dp)
                 .clip(CircleShape)
-                .background(SurfaceWhite),
+                .background(Color.White),
               contentAlignment = Alignment.Center
             ) {
               Image(
@@ -255,6 +272,9 @@ fun ChurchSettingsDrawerContent(
           .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
       ) {
+        // THEME / APPEARANCE SWITCHER (System Default / Light / Dark)
+        ThemeModeSelectorCard()
+
         // LANGUAGE SWITCHER SECTION
         Card(
           modifier = Modifier.fillMaxWidth().testTag("language_switcher_card"),
@@ -483,7 +503,7 @@ fun ChurchSettingsDrawerContent(
                   )
                 },
                 colors = SwitchDefaults.colors(
-                  checkedThumbColor = SurfaceWhite,
+                  checkedThumbColor = TextWhite,
                   checkedTrackColor = ClassicChurchBlue
                 ),
                 modifier = Modifier.testTag("drawer_daily_verse_switch")
@@ -526,7 +546,7 @@ fun ChurchSettingsDrawerContent(
                   )
                 },
                 colors = SwitchDefaults.colors(
-                  checkedThumbColor = SurfaceWhite,
+                  checkedThumbColor = TextWhite,
                   checkedTrackColor = ClassicChurchBlue
                 ),
                 modifier = Modifier.testTag("drawer_notices_switch")

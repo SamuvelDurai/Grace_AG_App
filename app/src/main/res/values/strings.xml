@@ -179,4 +179,9 @@
     <string name="church_family_birthdays_week_subtitle">Upcoming church family celebrations this week</string>
     <string name="weekly_birthday_reminder_title">This Week\'s Birthdays Reminder</string>
     <string name="weekly_birthday_reminder_subtitle">Next 7 days • Pastor &amp; Admin celebration list</string>
+    <string name="theme_settings_title">App Theme &amp; Appearance</string>
+    <string name="theme_settings_subtitle">Choose System Default, Light, or Dark mode</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
 </resources>

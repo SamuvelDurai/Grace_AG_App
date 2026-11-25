@@ -179,4 +179,9 @@
     <string name="church_family_birthdays_week_subtitle">இந்த வாரம் வரும் சபை கொண்டாட்டங்கள்</string>
     <string name="weekly_birthday_reminder_title">இந்த வார பிறந்தநாள் நினைவூட்டல்</string>
     <string name="weekly_birthday_reminder_subtitle">அடுத்த 7 நாட்கள் • போதகர் &amp; நிர்வாகப் பட்டியல்</string>
+    <string name="theme_settings_title">செயலி தோற்றம் &amp; தீம்</string>
+    <string name="theme_settings_subtitle">கணினி இயல்பு, வெளிச்சம் அல்லது இருள் பயன்முறை</string>
+    <string name="theme_system">இயல்பு</string>
+    <string name="theme_light">வெளிச்சம்</string>
+    <string name="theme_dark">இருள்</string>
 </resources>

@@ -255,14 +255,15 @@ fun DigitalMembershipCardDialog(
 
           Spacer(modifier = Modifier.height(18.dp))
 
-          // QR Code Display
+          // QR Code Display (Always high-contrast dark on white for reliable camera scanning)
+          val qrModuleColor = DeepRoyalNavy
           Box(
             modifier = Modifier
-              .size(160.dp)
-              .clip(RoundedCornerShape(12.dp))
-              .background(SoftBlueContainer)
-              .border(BorderStroke(1.dp, SoftBlueBorder), RoundedCornerShape(12.dp))
-              .padding(10.dp),
+              .size(164.dp)
+              .clip(RoundedCornerShape(14.dp))
+              .background(Color.White)
+              .border(BorderStroke(1.5.dp, SoftBlueBorder), RoundedCornerShape(14.dp))
+              .padding(12.dp),
             contentAlignment = Alignment.Center
           ) {
             Canvas(modifier = Modifier.size(140.dp)) {
@@ -273,7 +274,7 @@ fun DigitalMembershipCardDialog(
                 for (c in 0 until matrixSize) {
                   if (qrMatrix[r][c]) {
                     drawRect(
-                      color = TextDeepNavy,
+                      color = qrModuleColor,
                       topLeft = Offset(c * cellSize, r * cellSize),
                       size = Size(cellSize, cellSize)
                     )

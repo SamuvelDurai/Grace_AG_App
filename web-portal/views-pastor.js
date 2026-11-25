@@ -6,6 +6,7 @@ import {
   openModal,
   closeModal,
   renderAvatar,
+  resolvePhotoUrl,
   statusBadge
 } from "./utils.js";
 import { resolveActiveDailyVerse, todayDateKey } from "./verses-catalog.js";
@@ -238,7 +239,19 @@ export function renderOverviewView(container, state, actions) {
 export function renderMembersView(container, state, actions) {
   const query = (state.ui.memberSearch || "").trim().toLowerCase();
   const statusFilter = state.ui.memberFilter || "ALL";
-  const believerByUid = new Map(state.believers.map((b) => [b.uid, b]));
+  const believerByUid = new Map();
+  for (const b of state.believers || []) {
+    if (!b.uid) continue;
+    const prev = believerByUid.get(b.uid);
+    if (!prev) {
+      believerByUid.set(b.uid, b);
+    } else {
+      const mergedPhoto = resolvePhotoUrl(b.profilePhotoUrl, prev.profilePhotoUrl);
+      const preferred = b.memberId === `mem_${b.uid}` ? b : prev;
+      believerByUid.set(b.uid, { ...preferred, profilePhotoUrl: mergedPhoto });
+    }
+  }
+  const appByUid = new Map((state.applications || []).map((a) => [a.uid, a]));
 
   const filtered = state.users.filter((u) => {
     if (statusFilter !== "ALL" && u.accountStatus !== statusFilter) return false;
@@ -253,13 +266,14 @@ export function renderMembersView(container, state, actions) {
   const rows = filtered
     .map((u) => {
       const believer = believerByUid.get(u.uid);
-      const photo = believer?.profilePhotoUrl || u.photoUrl || "";
+      const app = appByUid.get(u.uid);
+      const photo = resolvePhotoUrl(believer?.profilePhotoUrl, u.photoUrl, app?.profilePhotoUrl);
       const canManageRole = state.currentUserProfile?.role === "SUPER_ADMIN" && u.uid !== state.currentUserProfile.uid;
       return `
         <tr>
           <td>
             <div class="member-cell">
-              ${renderAvatar(u.displayName || u.email, photo)}
+              ${renderAvatar(u.displayName || u.email, photo, u.uid)}
               <div>
                 <strong>${esc(u.displayName || "Unnamed Member")}</strong>
                 <div class="muted">${esc(u.email || u.phoneNumber || u.uid)}</div>
@@ -417,6 +431,30 @@ export function renderMembersView(container, state, actions) {
             closeModal();
           });
         }
+      );
+    });
+  });
+
+  container.querySelectorAll("[data-preview-photo-uid]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const uid = el.dataset.previewPhotoUid;
+      const u = state.users.find((x) => x.uid === uid);
+      const b = believerByUid.get(uid);
+      const app = appByUid.get(uid);
+      const name = u?.displayName || b?.fullName || "Church Member";
+      const photo = resolvePhotoUrl(b?.profilePhotoUrl, u?.photoUrl, app?.profilePhotoUrl);
+      openModal(
+        name,
+        `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0;">
+          ${
+            photo
+              ? `<img src="${esc(photo)}" alt="${esc(name)}" style="width:220px;height:220px;border-radius:50%;object-fit:cover;border:3px solid #2b6cb0;" />`
+              : `<div class="avatar-circle" style="width:140px;height:140px;font-size:44px;">${esc(name.slice(0, 2).toUpperCase())}</div><div class="muted">No profile photo uploaded yet.</div>`
+          }
+          <div class="muted">${esc(u?.membershipId || b?.membershipId || "Pending ID")} • ${esc(u?.phoneNumber || b?.phoneNumber || "")}</div>
+        </div>
+        `
       );
     });
   });

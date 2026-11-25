@@ -20,10 +20,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -49,27 +51,47 @@ fun SplashScreen(
   LaunchedEffect(Unit) {
     scale.animateTo(
       targetValue = 1f,
-      animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
+      animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
     )
     alpha.animateTo(
       targetValue = 1f,
-      animationSpec = tween(durationMillis = 600)
+      animationSpec = tween(durationMillis = 500)
     )
-    delay(1000)
+    delay(900)
     onAnimationFinished()
   }
 
   Box(
     modifier = modifier
       .fillMaxSize()
-      .background(
-        Brush.verticalGradient(
-          colors = listOf(DeepRoyalNavy, ClassicChurchBlue)
-        )
-      )
+      .background(DeepRoyalNavy)
       .testTag("splash_screen"),
     contentAlignment = Alignment.Center
   ) {
+    Image(
+      painter = painterResource(id = R.drawable.img_sanctuary_hero),
+      contentDescription = null,
+      contentScale = ContentScale.Crop,
+      modifier = Modifier
+        .fillMaxSize()
+        .scale(1.06f - (0.04f * scale.value))
+        .alpha(0.32f)
+    )
+
+    Box(
+      modifier = Modifier
+        .fillMaxSize()
+        .background(
+          Brush.verticalGradient(
+            colors = listOf(
+              DeepRoyalNavy.copy(alpha = 0.72f),
+              ClassicChurchBlue.copy(alpha = 0.80f),
+              DeepRoyalNavy.copy(alpha = 0.94f)
+            )
+          )
+        )
+    )
+
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.Center,
@@ -77,14 +99,14 @@ fun SplashScreen(
     ) {
       Box(
         modifier = Modifier
-          .size(114.dp)
+          .size(118.dp)
           .clip(CircleShape)
-          .background(Color.White.copy(alpha = 0.15f)),
+          .background(Color.White.copy(alpha = 0.16f)),
         contentAlignment = Alignment.Center
       ) {
         Box(
           modifier = Modifier
-            .size(96.dp)
+            .size(98.dp)
             .clip(CircleShape)
             .background(Color.White),
           contentAlignment = Alignment.Center
@@ -99,14 +121,14 @@ fun SplashScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(28.dp))
+      Spacer(modifier = Modifier.height(26.dp))
 
       Text(
         text = stringResource(id = R.string.app_name),
         style = MaterialTheme.typography.headlineMedium.copy(
           fontWeight = FontWeight.Bold,
           color = TextWhite,
-          letterSpacing = 1.2.sp
+          letterSpacing = 1.4.sp
         )
       )
 
@@ -118,7 +140,8 @@ fun SplashScreen(
           color = TextIceBlue,
           fontWeight = FontWeight.Medium
         ),
-        textAlign = TextAlign.Center
+        textAlign = TextAlign.Center,
+        modifier = Modifier.alpha(0.35f + (0.65f * alpha.value))
       )
     }
   }

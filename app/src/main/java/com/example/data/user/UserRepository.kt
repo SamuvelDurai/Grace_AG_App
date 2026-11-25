@@ -192,6 +192,9 @@ class UserRepository(private val db: FirebaseFirestore) {
     if (profile.familyId.isNotBlank()) {
       payload["familyId"] = profile.familyId
     }
+    if (profile.photoUrl.isNotBlank()) {
+      payload["photoUrl"] = profile.photoUrl
+    }
 
     try {
       docRef.set(payload, SetOptions.merge()).await()
@@ -214,7 +217,8 @@ class UserRepository(private val db: FirebaseFirestore) {
     churchId: String = "church_main",
     familyId: String = "",
     familyName: String = "",
-    familyMembers: List<com.example.core.model.FamilyMemberEntry> = emptyList()
+    familyMembers: List<com.example.core.model.FamilyMemberEntry> = emptyList(),
+    profilePhotoUrl: String = ""
   ): Result<String> = runCatching {
     val uid = auth.currentUser?.uid ?: return@runCatching ""
     val docRef = db.collection("membershipApplications").document(uid)
@@ -249,6 +253,9 @@ class UserRepository(private val db: FirebaseFirestore) {
       "status" to AccountStatus.PENDING.name,
       "submittedAt" to FieldValue.serverTimestamp()
     )
+    if (profilePhotoUrl.isNotBlank()) {
+      payload["profilePhotoUrl"] = profilePhotoUrl
+    }
 
     try {
       docRef.set(payload, SetOptions.merge()).await()

@@ -1,6 +1,11 @@
 package com.example.presentation.dashboard
 
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -97,17 +102,24 @@ import com.example.BuildConfig
 import com.example.R
 import com.example.core.localization.LanguageManager
 import com.example.core.model.AccountStatus
+import com.example.core.model.BelieverMember
 import com.example.core.model.ChurchConfig
 import com.example.core.model.UserProfile
 import com.example.core.model.UserRole
+import com.example.core.util.ProfilePhotoHelper
 import com.example.data.admin.ChurchAdminRepository
 import com.example.data.event.ChurchEventRepository
 import com.example.data.fellowship.FellowshipRepository
 import com.example.data.member.MemberRepository
 import com.example.presentation.auth.AuthUiState
 import com.example.presentation.auth.AuthViewModel
+import com.example.presentation.common.AnimatedEntranceItem
+import com.example.presentation.common.ChurchPageHeroBanner
 import com.example.presentation.common.ChurchSettingsDrawerContent
 import com.example.presentation.common.MemberAvatar
+import com.example.presentation.common.MemberPhotoPreviewDialog
+import com.example.presentation.common.SmoothTabContent
+import com.example.presentation.common.ThemeModeSelectorCard
 import com.example.presentation.common.WeeklyBirthdayReminderCard
 import com.example.ui.theme.ClassicChurchBlue
 import com.example.ui.theme.CleanBackground
@@ -122,7 +134,9 @@ import com.example.ui.theme.TextDeepNavy
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextSlate
 import com.example.ui.theme.TextWhite
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -309,34 +323,40 @@ fun SuperAdminDashboardScreen(
           .fillMaxSize()
           .padding(paddingValues)
       ) {
-        when (selectedTab) {
-          0 -> SuperAdminOverviewTab(
-            churchAdminRepository = churchAdminRepository,
-            memberRepository = memberRepository,
-            fellowshipRepository = fellowshipRepository,
-            churchEventRepository = churchEventRepository,
-            churchId = churchId,
-            currentUid = userProfile.uid,
-            actorName = actorName,
-            currentLanguage = currentLanguage,
-            onNavigateToAccounts = { selectedTab = 1 },
-            onNavigateToChurchConfig = { selectedTab = 2 },
-            onNavigateToAuditLogs = { selectedTab = 3 }
-          )
-          1 -> AdminAccountsTab(
-            churchAdminRepository = churchAdminRepository,
-            memberRepository = memberRepository,
-            actorName = actorName
-          )
-          2 -> AdminChurchConfigTab(
-            churchAdminRepository = churchAdminRepository,
-            churchId = churchId,
-            actorName = actorName
-          )
-          3 -> AdminAuditLogsTab(
-            churchAdminRepository = churchAdminRepository
-          )
-          4 -> AdminSettingsTab(viewModel = viewModel)
+        SmoothTabContent(
+          targetState = selectedTab,
+          label = "super_admin_tabs"
+        ) { tab ->
+          when (tab) {
+            0 -> SuperAdminOverviewTab(
+              churchAdminRepository = churchAdminRepository,
+              memberRepository = memberRepository,
+              fellowshipRepository = fellowshipRepository,
+              churchEventRepository = churchEventRepository,
+              churchId = churchId,
+              currentUid = userProfile.uid,
+              actorName = actorName,
+              currentLanguage = currentLanguage,
+              onNavigateToAccounts = { selectedTab = 1 },
+              onNavigateToChurchConfig = { selectedTab = 2 },
+              onNavigateToAuditLogs = { selectedTab = 3 }
+            )
+            1 -> AdminAccountsTab(
+              churchAdminRepository = churchAdminRepository,
+              memberRepository = memberRepository,
+              churchId = churchId,
+              actorName = actorName
+            )
+            2 -> AdminChurchConfigTab(
+              churchAdminRepository = churchAdminRepository,
+              churchId = churchId,
+              actorName = actorName
+            )
+            3 -> AdminAuditLogsTab(
+              churchAdminRepository = churchAdminRepository
+            )
+            4 -> AdminSettingsTab(viewModel = viewModel)
+          }
         }
       }
     }
@@ -360,7 +380,7 @@ private fun SuperAdminOverviewTab(
   val churchConfig by churchAdminRepository.observeChurchConfig(churchId)
     .collectAsState(initial = ChurchConfig(churchId = churchId))
   val accounts by churchAdminRepository.observeManagedUsers(churchId).collectAsState(initial = emptyList())
-  val members by memberRepository.observeAllMembers().collectAsState(initial = emptyList())
+  val members by memberRepository.observeAllMembers(churchId).collectAsState(initial = emptyList())
   val groups by fellowshipRepository.observeFellowshipGroups().collectAsState(initial = emptyList())
   val events by churchEventRepository.observeEvents().collectAsState(initial = emptyList())
   val logs by churchAdminRepository.observeAuditLogs(churchId).collectAsState(initial = emptyList())
@@ -376,59 +396,79 @@ private fun SuperAdminOverviewTab(
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
     item {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-      ) {
-        AdminStatCard(
-          title = "Active Church",
-          value = "1",
-          subtitle = churchConfig.name,
-          modifier = Modifier.weight(1f),
-          onClick = onNavigateToChurchConfig
-        )
-        AdminStatCard(
-          title = "Approved Pastors",
-          value = "$pastorCount",
-          subtitle = "${accounts.size} total accounts",
-          modifier = Modifier.weight(1f),
-          onClick = onNavigateToAccounts
+      AnimatedEntranceItem(index = 0) {
+        ChurchPageHeroBanner(
+          imageRes = R.drawable.img_church_celebration,
+          badgeText = stringResource(id = R.string.super_admin_title),
+          badgeIcon = Icons.Default.Church,
+          title = churchConfig.name.ifBlank { "GRACE AG" },
+          subtitle = "$pastorCount Pastors • ${members.size} Believers • ${accounts.size} Accounts",
+          height = 148.dp,
+          contentDescription = stringResource(id = R.string.super_admin_title)
         )
       }
     }
 
     item {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-      ) {
-        AdminStatCard(
-          title = "Registered Believers",
-          value = "${members.size}",
-          subtitle = "${groups.size} care cells & wings",
-          modifier = Modifier.weight(1f),
-          onClick = onNavigateToAccounts
-        )
-        AdminStatCard(
-          title = "Events & Audit",
-          value = "${events.size}",
-          subtitle = "${logs.size} audit records",
-          modifier = Modifier.weight(1f),
-          isPositive = true,
-          onClick = onNavigateToAuditLogs
-        )
+      AnimatedEntranceItem(index = 1) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+          AdminStatCard(
+            title = "Active Church",
+            value = "1",
+            subtitle = churchConfig.name,
+            modifier = Modifier.weight(1f),
+            onClick = onNavigateToChurchConfig
+          )
+          AdminStatCard(
+            title = "Approved Pastors",
+            value = "$pastorCount",
+            subtitle = "${accounts.size} total accounts",
+            modifier = Modifier.weight(1f),
+            onClick = onNavigateToAccounts
+          )
+        }
       }
     }
 
     item {
-      WeeklyBirthdayReminderCard(
-        celebrations = churchCelebrations,
-        churchId = churchId,
-        currentUid = currentUid,
-        actorName = actorName,
-        currentLanguage = currentLanguage,
-        celebrationRepository = memberRepository.celebrationRepository
-      )
+      AnimatedEntranceItem(index = 2) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+          AdminStatCard(
+            title = "Registered Believers",
+            value = "${members.size}",
+            subtitle = "${groups.size} care cells & wings",
+            modifier = Modifier.weight(1f),
+            onClick = onNavigateToAccounts
+          )
+          AdminStatCard(
+            title = "Events & Audit",
+            value = "${events.size}",
+            subtitle = "${logs.size} audit records",
+            modifier = Modifier.weight(1f),
+            isPositive = true,
+            onClick = onNavigateToAuditLogs
+          )
+        }
+      }
+    }
+
+    item {
+      AnimatedEntranceItem(index = 3) {
+        WeeklyBirthdayReminderCard(
+          celebrations = churchCelebrations,
+          churchId = churchId,
+          currentUid = currentUid,
+          actorName = actorName,
+          currentLanguage = currentLanguage,
+          celebrationRepository = memberRepository.celebrationRepository
+        )
+      }
     }
 
     item {
@@ -512,16 +552,84 @@ private fun SuperAdminOverviewTab(
 private fun AdminAccountsTab(
   churchAdminRepository: ChurchAdminRepository,
   memberRepository: MemberRepository,
+  churchId: String,
   actorName: String
 ) {
   val context = LocalContext.current
   val coroutineScope = rememberCoroutineScope()
-  val accounts by churchAdminRepository.observeManagedUsers().collectAsState(initial = emptyList())
-  val members by memberRepository.observeAllMembers().collectAsState(initial = emptyList())
+  val resolvedChurchId = churchId.ifBlank { "church_main" }
+  val accounts by churchAdminRepository.observeManagedUsers(resolvedChurchId).collectAsState(initial = emptyList())
+  val members by memberRepository.observeAllMembers(resolvedChurchId).collectAsState(initial = emptyList())
   var selectedFilter by remember { mutableStateOf("ALL") }
   var statusMessage by remember { mutableStateOf<String?>(null) }
   var isStatusError by remember { mutableStateOf(false) }
   var showCreatePastorDialog by remember { mutableStateOf(false) }
+  var previewPhotoAccount by remember { mutableStateOf<Pair<UserProfile, BelieverMember?>?>(null) }
+  var isUploadingPhoto by remember { mutableStateOf(false) }
+
+  val adminPhotoPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickVisualMedia()
+  ) { uri: Uri? ->
+    val targetPair = previewPhotoAccount ?: return@rememberLauncherForActivityResult
+    val (account, matchedMember) = targetPair
+    uri?.let { pickedUri ->
+      isUploadingPhoto = true
+      coroutineScope.launch {
+        val compressed = withContext(Dispatchers.IO) {
+          ProfilePhotoHelper.encodeUriToCompressedDataUri(context, pickedUri)
+        }
+        if (compressed != null) {
+          val targetMember = matchedMember ?: BelieverMember(
+            memberId = "mem_${account.uid}",
+            uid = account.uid,
+            churchId = account.churchId.ifBlank { resolvedChurchId },
+            membershipId = account.membershipId,
+            fullName = account.displayName.ifBlank { "Church Member" },
+            phoneNumber = account.phoneNumber,
+            email = account.email,
+            familyId = account.familyId
+          )
+          val res = memberRepository.updateMemberPhoto(targetMember, compressed)
+          isUploadingPhoto = false
+          res.onSuccess { savedPhoto ->
+            previewPhotoAccount = account.copy(photoUrl = savedPhoto) to targetMember.copy(profilePhotoUrl = savedPhoto)
+            Toast.makeText(context, "Updated photo for ${account.displayName}", Toast.LENGTH_SHORT).show()
+          }.onFailure { err ->
+            Toast.makeText(context, err.localizedMessage ?: "Failed to save photo", Toast.LENGTH_LONG).show()
+          }
+        } else {
+          isUploadingPhoto = false
+          Toast.makeText(context, "Unable to read selected image.", Toast.LENGTH_SHORT).show()
+        }
+      }
+    }
+  }
+
+  if (previewPhotoAccount != null) {
+    val (account, matchedMember) = previewPhotoAccount!!
+    val latestAccount = accounts.firstOrNull { it.uid == account.uid } ?: account
+    val latestMember = members.firstOrNull { it.uid == account.uid } ?: matchedMember
+    val resolvedPreviewPhoto = ProfilePhotoHelper.resolvePhotoUrl(
+      latestMember?.profilePhotoUrl,
+      latestAccount.photoUrl,
+      account.photoUrl
+    )
+    MemberPhotoPreviewDialog(
+      photoUrl = resolvedPreviewPhoto,
+      displayName = latestAccount.displayName.ifBlank { latestMember?.fullName ?: "Church Member" },
+      subtitle = listOfNotNull(
+        latestAccount.membershipId.ifBlank { latestMember?.membershipId }.takeIf { !it.isNullOrBlank() },
+        latestAccount.userRole.name
+      ).joinToString(" • "),
+      isUploading = isUploadingPhoto,
+      onChangePhoto = {
+        adminPhotoPickerLauncher.launch(
+          PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
+      },
+      onDismiss = { if (!isUploadingPhoto) previewPhotoAccount = null }
+    )
+  }
 
   if (showCreatePastorDialog) {
     CreatePastorAccountDialog(
@@ -683,8 +791,11 @@ private fun AdminAccountsTab(
       val isPastor = account.userRole == UserRole.PASTOR
       val isSuperAdmin = account.userRole == UserRole.SUPER_ADMIN
 
-      val matchedMemberPhoto = members.firstOrNull { it.uid == account.uid }?.profilePhotoUrl.orEmpty()
-      val resolvedPhotoUrl = account.photoUrl.ifBlank { matchedMemberPhoto }
+      val matchedMember = members.firstOrNull { it.uid == account.uid }
+      val resolvedPhotoUrl = ProfilePhotoHelper.resolvePhotoUrl(
+        matchedMember?.profilePhotoUrl,
+        account.photoUrl
+      )
 
       Card(
         modifier = Modifier
@@ -703,7 +814,8 @@ private fun AdminAccountsTab(
             MemberAvatar(
               photoUrl = resolvedPhotoUrl,
               displayName = account.displayName.ifBlank { "Church User" },
-              size = 44.dp
+              size = 48.dp,
+              onClick = { previewPhotoAccount = account to matchedMember }
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -1503,6 +1615,8 @@ private fun AdminSettingsTab(viewModel: AuthViewModel) {
         color = TextDeepNavy
       )
     )
+
+    ThemeModeSelectorCard()
 
     Card(
       modifier = Modifier.fillMaxWidth(),

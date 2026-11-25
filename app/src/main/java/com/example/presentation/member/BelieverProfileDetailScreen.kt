@@ -92,6 +92,7 @@ fun BelieverProfileDetailScreen(
   member: BelieverMember,
   memberRepository: MemberRepository,
   onNavigateBack: () -> Unit,
+  onPhotoUpdated: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
@@ -100,27 +101,34 @@ fun BelieverProfileDetailScreen(
   var saveSuccessMessage by remember { mutableStateOf<String?>(null) }
   var saveErrorMessage by remember { mutableStateOf<String?>(null) }
   var isEncodingPhoto by remember { mutableStateOf(false) }
+  var photoStatusMessage by remember { mutableStateOf<String?>(null) }
   var showConnectDialog by remember { mutableStateOf(false) }
   var editingLinkedRoleEntry by remember { mutableStateOf<FamilyMemberEntry?>(null) }
 
   // Form Fields
-  var fullName by remember { mutableStateOf(member.fullName) }
-  var phoneNumber by remember { mutableStateOf(member.phoneNumber) }
-  var email by remember { mutableStateOf(member.email) }
-  var dateOfBirth by remember { mutableStateOf(member.dateOfBirth) }
-  var gender by remember { mutableStateOf(member.gender) }
-  var address by remember { mutableStateOf(member.address) }
-  var selectedPhotoUri by remember { mutableStateOf(member.profilePhotoUrl) }
+  var fullName by remember(member.uid) { mutableStateOf(member.fullName) }
+  var phoneNumber by remember(member.uid) { mutableStateOf(member.phoneNumber) }
+  var email by remember(member.uid) { mutableStateOf(member.email) }
+  var dateOfBirth by remember(member.uid) { mutableStateOf(member.dateOfBirth) }
+  var gender by remember(member.uid) { mutableStateOf(member.gender) }
+  var address by remember(member.uid) { mutableStateOf(member.address) }
+  var selectedPhotoUri by remember(member.uid) { mutableStateOf(member.profilePhotoUrl) }
+
+  LaunchedEffect(member.uid, member.profilePhotoUrl) {
+    if (selectedPhotoUri.isBlank() && member.profilePhotoUrl.isNotBlank()) {
+      selectedPhotoUri = member.profilePhotoUrl
+    }
+  }
 
   // Family Fields
   val observedFamily by memberRepository.familyRepository
     .observeFamilyForMember(member.uid, member.effectiveFamilyId())
     .collectAsState(initial = null)
-  var fatherName by remember { mutableStateOf(member.fatherName) }
-  var motherName by remember { mutableStateOf(member.motherName) }
-  var spouseName by remember { mutableStateOf(member.spouseName) }
-  var familyName by remember { mutableStateOf(member.effectiveFamilyName()) }
-  var familyMembers by remember { mutableStateOf(member.familyMembers) }
+  var fatherName by remember(member.uid) { mutableStateOf(member.fatherName) }
+  var motherName by remember(member.uid) { mutableStateOf(member.motherName) }
+  var spouseName by remember(member.uid) { mutableStateOf(member.spouseName) }
+  var familyName by remember(member.uid) { mutableStateOf(member.effectiveFamilyName()) }
+  var familyMembers by remember(member.uid) { mutableStateOf(member.familyMembers) }
 
   LaunchedEffect(observedFamily) {
     val fam = observedFamily ?: return@LaunchedEffect
@@ -131,11 +139,11 @@ fun BelieverProfileDetailScreen(
   }
 
   // Baptism & Spiritual Fields
-  var baptismStatus by remember { mutableStateOf(member.baptismStatus) }
-  var baptismDate by remember { mutableStateOf(member.baptismDate) }
-  var baptismPlace by remember { mutableStateOf(member.baptismPlace) }
-  var baptizedBy by remember { mutableStateOf(member.baptizedBy) }
-  var ministryGroup by remember { mutableStateOf(member.ministryGroup) }
+  var baptismStatus by remember(member.uid) { mutableStateOf(member.baptismStatus) }
+  var baptismDate by remember(member.uid) { mutableStateOf(member.baptismDate) }
+  var baptismPlace by remember(member.uid) { mutableStateOf(member.baptismPlace) }
+  var baptizedBy by remember(member.uid) { mutableStateOf(member.baptizedBy) }
+  var ministryGroup by remember(member.uid) { mutableStateOf(member.ministryGroup) }
 
   // Android Photo Picker Launcher (Zero permissions required, 100% Play Policy compliant)
   val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -143,15 +151,41 @@ fun BelieverProfileDetailScreen(
   ) { uri: Uri? ->
     uri?.let { pickedUri ->
       isEncodingPhoto = true
+      photoStatusMessage = "Uploading photo..."
+      saveErrorMessage = null
       coroutineScope.launch {
         val compressed = withContext(Dispatchers.IO) {
           ProfilePhotoHelper.encodeUriToCompressedDataUri(context, pickedUri)
         }
-        isEncodingPhoto = false
         if (compressed != null) {
           selectedPhotoUri = compressed
-          saveSuccessMessage = null
+          val saveResult = memberRepository.updateMemberPhoto(
+            member = member.copy(
+              fullName = fullName.ifBlank { member.fullName },
+              phoneNumber = phoneNumber.ifBlank { member.phoneNumber },
+              email = email.ifBlank { member.email },
+              dateOfBirth = dateOfBirth.ifBlank { member.dateOfBirth }
+            ),
+            photoDataUri = compressed
+          )
+          isEncodingPhoto = false
+          saveResult.fold(
+            onSuccess = {
+              photoStatusMessage = "Profile photo saved!"
+              saveSuccessMessage = "Profile photo saved and synced!"
+              onPhotoUpdated()
+              Toast.makeText(context, "Profile photo saved!", Toast.LENGTH_SHORT).show()
+            },
+            onFailure = { err ->
+              photoStatusMessage = null
+              saveErrorMessage = err.localizedMessage ?: "Failed to save profile photo. Tap Save Profile Changes to retry."
+              Toast.makeText(context, saveErrorMessage, Toast.LENGTH_LONG).show()
+            }
+          )
         } else {
+          isEncodingPhoto = false
+          photoStatusMessage = null
+          saveErrorMessage = "Unable to read selected image. Please choose a JPG or PNG photo."
           Toast.makeText(context, "Unable to read selected image.", Toast.LENGTH_SHORT).show()
         }
       }
@@ -332,7 +366,17 @@ fun BelieverProfileDetailScreen(
             }
           }
 
-          Spacer(modifier = Modifier.height(12.dp))
+          Spacer(modifier = Modifier.height(8.dp))
+
+          Text(
+            text = photoStatusMessage ?: "Tap photo to upload • Saves automatically",
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = if (photoStatusMessage == "Profile photo saved!") SuccessGreen else TextSlate,
+              fontWeight = if (photoStatusMessage != null) FontWeight.Bold else FontWeight.Medium
+            )
+          )
+
+          Spacer(modifier = Modifier.height(6.dp))
 
           Text(
             text = fullName.ifBlank { "Church Member" },
@@ -592,7 +636,7 @@ fun BelieverProfileDetailScreen(
 
       if (saveSuccessMessage != null) {
         Surface(
-          color = Color(0xFFDCFCE7),
+          color = com.example.ui.theme.SuccessGreenContainer,
           shape = RoundedCornerShape(10.dp),
           modifier = Modifier.fillMaxWidth()
         ) {
@@ -639,7 +683,10 @@ fun BelieverProfileDetailScreen(
             )
             val result = memberRepository.saveMemberProfile(updated)
             result.fold(
-              onSuccess = { saveSuccessMessage = "Profile updated successfully!" },
+              onSuccess = {
+                onPhotoUpdated()
+                saveSuccessMessage = "Profile updated successfully!"
+              },
               onFailure = { err -> saveErrorMessage = err.localizedMessage ?: "Failed to save profile." }
             )
           }

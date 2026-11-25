@@ -20,6 +20,7 @@ import com.example.core.model.AccountStatus
 import com.example.core.model.UserRole
 import com.example.core.notifications.NotificationSyncObserver
 import com.example.presentation.common.AppUpdateChecker
+import com.example.presentation.common.SmoothTabContent
 import com.example.data.admin.ChurchAdminRepository
 import com.example.data.announcement.AnnouncementRepository
 import com.example.data.content.BibleContentRepository
@@ -117,7 +118,12 @@ fun AppNavigation(
     }
   }
 
-  when (screenState) {
+  SmoothTabContent(
+    targetState = screenState,
+    label = "app_root_navigation",
+    modifier = modifier.fillMaxSize()
+  ) { currentScreen ->
+  when (currentScreen) {
     ScreenState.SPLASH -> {
       SplashScreen(
         onAnimationFinished = {
@@ -271,5 +277,6 @@ fun AppNavigation(
         }
       }
     }
+  }
   }
 }

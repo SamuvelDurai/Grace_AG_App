@@ -1,4 +1,4 @@
-import { esc, formatTimestamp, statusBadge } from "./utils.js";
+import { esc, formatTimestamp, renderAvatar, resolvePhotoUrl, statusBadge } from "./utils.js";
 
 export function renderUpdaterView(container, state, actions) {
   const cfg = state.churchConfig || {};
@@ -96,18 +96,28 @@ export function renderChurchAndPastorsView(container, state, actions) {
   const cfg = state.churchConfig || {};
   const pastors = state.users.filter((u) => u.role === "PASTOR" || u.role === "SUPER_ADMIN");
 
+  const believerByUid = new Map((state.believers || []).map((b) => [b.uid, b]));
   const pastorRows = pastors
-    .map(
-      (p) => `
+    .map((p) => {
+      const photo = resolvePhotoUrl(believerByUid.get(p.uid)?.profilePhotoUrl, p.photoUrl);
+      return `
       <tr>
-        <td><strong>${esc(p.displayName || p.email)}</strong><div class="muted">${esc(p.email || "")}</div></td>
+        <td>
+          <div class="member-cell">
+            ${renderAvatar(p.displayName || p.email, photo)}
+            <div>
+              <strong>${esc(p.displayName || p.email)}</strong>
+              <div class="muted">${esc(p.email || "")}</div>
+            </div>
+          </div>
+        </td>
         <td>${esc(p.phoneNumber || "—")}</td>
         <td><code>${esc(p.membershipId || "—")}</code></td>
         <td>${statusBadge(p.role)}</td>
         <td>${statusBadge(p.accountStatus)}</td>
       </tr>
-    `
-    )
+    `;
+    })
     .join("");
 
   container.innerHTML = `

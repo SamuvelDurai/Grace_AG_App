@@ -86,14 +86,26 @@ class MemberRepository(private val db: FirebaseFirestore) {
 
     val query = db.collection("believers")
       .whereEqualTo("uid", uid)
-      .limit(1)
+      .limit(5)
 
     return query.snapshots()
       .map { snapshot ->
-        snapshot.documents.firstOrNull()?.let { doc ->
+        val candidates = snapshot.documents.mapNotNull { doc ->
           doc.toObject(BelieverMember::class.java)?.let {
             if (it.memberId.isBlank()) it.copy(memberId = doc.id) else it
           }
+        }
+        if (candidates.isEmpty()) {
+          null
+        } else {
+          val primary = candidates.firstOrNull { it.memberId == "mem_$uid" }
+            ?: candidates.firstOrNull { com.example.core.util.ProfilePhotoHelper.isCrossDevicePhotoUrl(it.profilePhotoUrl) }
+            ?: candidates.first()
+          val mergedPhoto = com.example.core.util.ProfilePhotoHelper.resolvePhotoUrl(
+            primary.profilePhotoUrl,
+            *candidates.map { it.profilePhotoUrl }.toTypedArray()
+          )
+          primary.copy(profilePhotoUrl = mergedPhoto)
         }
       }
       .catch { error ->
@@ -132,30 +144,164 @@ class MemberRepository(private val db: FirebaseFirestore) {
     }
   }
 
+  suspend fun updateMemberPhoto(
+    member: BelieverMember,
+    photoDataUri: String
+  ): Result<String> = runCatching {
+    val cleanPhoto = photoDataUri.trim()
+    require(com.example.core.util.ProfilePhotoHelper.isCrossDevicePhotoUrl(cleanPhoto)) {
+      "Selected photo could not be processed. Please choose a different image."
+    }
+    require(cleanPhoto.length <= 195_000) {
+      "Selected photo is too large to sync. Please pick a smaller image."
+    }
+
+    val currentUser = auth.currentUser
+    val targetUid = member.uid.ifBlank { currentUser?.uid.orEmpty() }
+    val docId = member.memberId.ifBlank { "mem_$targetUid" }
+    val resolvedChurchId = member.churchId.ifBlank { "church_main" }
+    val updatedLocal = member.copy(
+      memberId = docId,
+      uid = targetUid,
+      churchId = resolvedChurchId,
+      profilePhotoUrl = cleanPhoto
+    )
+
+    val idx = inMemoryMembers.indexOfFirst { it.uid == targetUid || it.memberId == docId }
+    if (idx >= 0) {
+      inMemoryMembers[idx] = updatedLocal
+    } else {
+      inMemoryMembers.add(updatedLocal)
+    }
+    _membersFlow.value = inMemoryMembers.toList()
+
+    if (currentUser == null) {
+      return@runCatching cleanPhoto
+    }
+
+    // 1. Write to canonical believers/{docId} (merge creates doc cleanly if missing)
+    val believerRef = db.collection("believers").document(docId)
+    val believerPatch = hashMapOf<String, Any?>(
+      "memberId" to docId,
+      "uid" to targetUid,
+      "churchId" to resolvedChurchId,
+      "fullName" to updatedLocal.fullName.ifBlank { "Church Member" },
+      "profilePhotoUrl" to cleanPhoto,
+      "updatedAt" to FieldValue.serverTimestamp()
+    )
+    if (updatedLocal.membershipId.isNotBlank()) believerPatch["membershipId"] = updatedLocal.membershipId
+    if (updatedLocal.phoneNumber.isNotBlank()) believerPatch["phoneNumber"] = updatedLocal.phoneNumber
+    if (updatedLocal.email.isNotBlank()) believerPatch["email"] = updatedLocal.email
+
+    try {
+      believerRef.set(believerPatch, SetOptions.merge()).await()
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.UPDATE, believerRef.path)
+      throw e
+    }
+
+    // 2. Sync any duplicate believers docs for the same uid so no stale copy hides the photo
+    if (targetUid.isNotBlank()) {
+      runCatching {
+        val dupDocs = db.collection("believers")
+          .whereEqualTo("uid", targetUid)
+          .limit(5)
+          .get()
+          .await()
+          .documents
+        dupDocs.forEach { dup ->
+          if (dup.id != docId) {
+            dup.reference.set(
+              mapOf(
+                "profilePhotoUrl" to cleanPhoto,
+                "updatedAt" to FieldValue.serverTimestamp()
+              ),
+              SetOptions.merge()
+            ).await()
+          }
+        }
+      }
+    }
+
+    // 3. Sync to users/{targetUid}.photoUrl so Pastor, Super Admin & Web Portal always see it
+    if (targetUid.isNotBlank()) {
+      val userRef = db.collection("users").document(targetUid)
+      try {
+        userRef.update(
+          mapOf(
+            "photoUrl" to cleanPhoto,
+            "updatedAt" to FieldValue.serverTimestamp()
+          )
+        ).await()
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        handleFirestoreError(e, OperationType.UPDATE, userRef.path)
+      }
+    }
+
+    // 4. Sync to memberLookup, families, and churchCelebrations
+    runCatching { syncMemberLookupKeys(updatedLocal) }
+    runCatching { familyRepository.syncFromBelieverMember(updatedLocal) }
+    runCatching { celebrationRepository.syncBirthdayFromBeliever(updatedLocal) }
+
+    cleanPhoto
+  }
+
   suspend fun saveMemberProfile(member: BelieverMember): Result<Unit> = runCatching {
     val resolvedFamilyId = member.effectiveFamilyId()
     val resolvedFamilyName = member.effectiveFamilyName()
+    val cleanIncomingPhoto = com.example.core.util.ProfilePhotoHelper.resolvePhotoUrl(member.profilePhotoUrl)
     val normalizedMember = member.copy(
       familyId = resolvedFamilyId,
-      familyName = resolvedFamilyName
+      familyName = resolvedFamilyName,
+      profilePhotoUrl = cleanIncomingPhoto
     )
 
     val index = inMemoryMembers.indexOfFirst { it.uid == normalizedMember.uid || it.memberId == normalizedMember.memberId }
-    if (index >= 0) {
-      inMemoryMembers[index] = normalizedMember
+    val preservedLocalPhoto = if (cleanIncomingPhoto.isNotBlank()) {
+      cleanIncomingPhoto
+    } else if (index >= 0) {
+      inMemoryMembers[index].profilePhotoUrl
     } else {
-      inMemoryMembers.add(normalizedMember)
+      ""
+    }
+    val localWithPhoto = normalizedMember.copy(profilePhotoUrl = preservedLocalPhoto)
+    if (index >= 0) {
+      inMemoryMembers[index] = localWithPhoto
+    } else {
+      inMemoryMembers.add(localWithPhoto)
     }
     _membersFlow.value = inMemoryMembers.toList()
 
     val currentUser = auth.currentUser
     if (currentUser == null) {
-      familyRepository.syncFromBelieverMember(normalizedMember)
+      familyRepository.syncFromBelieverMember(localWithPhoto)
       return@runCatching
     }
 
-    val docId = normalizedMember.memberId.ifBlank { "mem_${normalizedMember.uid}" }
+    val targetUid = normalizedMember.uid.ifBlank { currentUser.uid }
+    val docId = normalizedMember.memberId.ifBlank { "mem_$targetUid" }
     val docRef = db.collection("believers").document(docId)
+
+    // Never wipe out an already-saved profile photo if caller passed blank
+    val effectivePhoto = if (cleanIncomingPhoto.isNotBlank()) {
+      cleanIncomingPhoto
+    } else {
+      runCatching {
+        val existingSnap = docRef.get().await()
+        val fromBeliever = existingSnap.getString("profilePhotoUrl")
+        val fromUser = if (fromBeliever.isNullOrBlank() && targetUid.isNotBlank()) {
+          db.collection("users").document(targetUid).get().await().getString("photoUrl")
+        } else {
+          null
+        }
+        com.example.core.util.ProfilePhotoHelper.resolvePhotoUrl(fromBeliever, fromUser)
+      }.getOrDefault("")
+    }
+
     val serializedFamilyMembers = normalizedMember.familyMembers.map { entry ->
       mapOf(
         "id" to entry.id.ifBlank { UUID.randomUUID().toString().take(8) },
@@ -171,15 +317,13 @@ class MemberRepository(private val db: FirebaseFirestore) {
       )
     }
 
-    val targetUid = normalizedMember.uid.ifBlank { currentUser.uid }
     val payload = hashMapOf<String, Any?>(
       "memberId" to docId,
       "uid" to targetUid,
       "churchId" to normalizedMember.churchId.ifBlank { "church_main" },
       "membershipId" to normalizedMember.membershipId,
-      "fullName" to normalizedMember.fullName,
-      "profilePhotoUrl" to normalizedMember.profilePhotoUrl,
       "phoneNumber" to normalizedMember.phoneNumber,
+      "fullName" to normalizedMember.fullName,
       "email" to normalizedMember.email,
       "dateOfBirth" to normalizedMember.dateOfBirth,
       "gender" to normalizedMember.gender,
@@ -203,6 +347,9 @@ class MemberRepository(private val db: FirebaseFirestore) {
       },
       "updatedAt" to FieldValue.serverTimestamp()
     )
+    if (effectivePhoto.isNotBlank()) {
+      payload["profilePhotoUrl"] = effectivePhoto
+    }
 
     try {
       docRef.set(payload, SetOptions.merge()).await()
@@ -215,36 +362,47 @@ class MemberRepository(private val db: FirebaseFirestore) {
 
     // Sync profile photo & basic details to /users/{uid} so Pastor & Super Admin see it across devices
     if (targetUid.isNotBlank()) {
-      runCatching {
-        val userUpdates = hashMapOf<String, Any?>(
-          "updatedAt" to FieldValue.serverTimestamp()
-        )
-        if (normalizedMember.profilePhotoUrl.isNotBlank()) {
-          userUpdates["photoUrl"] = normalizedMember.profilePhotoUrl
-        }
-        if (normalizedMember.fullName.isNotBlank()) {
-          userUpdates["displayName"] = normalizedMember.fullName.trim()
-        }
-        if (normalizedMember.phoneNumber.isNotBlank()) {
-          userUpdates["phoneNumber"] = normalizedMember.phoneNumber.trim()
-        }
-        if (userUpdates.size > 1) {
-          db.collection("users").document(targetUid).update(userUpdates).await()
+      val userRef = db.collection("users").document(targetUid)
+      val userUpdates = hashMapOf<String, Any?>(
+        "updatedAt" to FieldValue.serverTimestamp()
+      )
+      if (effectivePhoto.isNotBlank()) {
+        userUpdates["photoUrl"] = effectivePhoto
+      }
+      if (normalizedMember.fullName.isNotBlank()) {
+        userUpdates["displayName"] = normalizedMember.fullName.trim()
+      }
+      if (normalizedMember.phoneNumber.isNotBlank()) {
+        userUpdates["phoneNumber"] = normalizedMember.phoneNumber.trim()
+      }
+      if (userUpdates.size > 1) {
+        try {
+          userRef.update(userUpdates).await()
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          handleFirestoreError(e, OperationType.UPDATE, userRef.path)
         }
       }
     }
 
+    val syncedMember = normalizedMember.copy(
+      memberId = docId,
+      uid = targetUid,
+      profilePhotoUrl = effectivePhoto
+    )
+
     // Sync exact lookup keys (Membership ID & 10-digit Phone) so Family Heads can connect relatives cleanly
     runCatching {
-      syncMemberLookupKeys(normalizedMember.copy(memberId = docId, uid = targetUid))
+      syncMemberLookupKeys(syncedMember)
     }
 
     runCatching {
-      familyRepository.syncFromBelieverMember(normalizedMember.copy(memberId = docId, uid = targetUid)).getOrThrow()
+      familyRepository.syncFromBelieverMember(syncedMember).getOrThrow()
     }
 
     runCatching {
-      celebrationRepository.syncBirthdayFromBeliever(normalizedMember.copy(memberId = docId, uid = targetUid))
+      celebrationRepository.syncBirthdayFromBeliever(syncedMember)
     }
   }
 
@@ -452,11 +610,37 @@ class MemberRepository(private val db: FirebaseFirestore) {
       .limit(250)
       .snapshots()
       .map { snapshot ->
-        snapshot.documents.mapNotNull { doc ->
+        val raw = snapshot.documents.mapNotNull { doc ->
           doc.toObject(BelieverMember::class.java)?.let {
             if (it.memberId.isBlank()) it.copy(memberId = doc.id) else it
           }
         }
+        // Deduplicate by uid (if multiple docs exist for same believer) while always preserving non-blank photo
+        val byKey = linkedMapOf<String, BelieverMember>()
+        raw.forEach { candidate ->
+          val key = candidate.uid.ifBlank { candidate.memberId }
+          val existing = byKey[key]
+          if (existing == null) {
+            byKey[key] = candidate.copy(
+              profilePhotoUrl = com.example.core.util.ProfilePhotoHelper.resolvePhotoUrl(candidate.profilePhotoUrl)
+            )
+          } else {
+            val preferred = when {
+              candidate.memberId == "mem_${candidate.uid}" -> candidate
+              existing.memberId == "mem_${existing.uid}" -> existing
+              com.example.core.util.ProfilePhotoHelper.isCrossDevicePhotoUrl(candidate.profilePhotoUrl) &&
+                !com.example.core.util.ProfilePhotoHelper.isCrossDevicePhotoUrl(existing.profilePhotoUrl) -> candidate
+              else -> existing
+            }
+            val mergedPhoto = com.example.core.util.ProfilePhotoHelper.resolvePhotoUrl(
+              preferred.profilePhotoUrl,
+              candidate.profilePhotoUrl,
+              existing.profilePhotoUrl
+            )
+            byKey[key] = preferred.copy(profilePhotoUrl = mergedPhoto)
+          }
+        }
+        byKey.values.toList()
       }
       .catch { error ->
         if (error is CancellationException) throw error
@@ -515,13 +699,26 @@ class MemberRepository(private val db: FirebaseFirestore) {
       application.familyMembers
     }
 
+    val userDocPhoto = if (auth.currentUser != null && application.uid.isNotBlank()) {
+      runCatching {
+        db.collection("users").document(application.uid).get().await().getString("photoUrl")
+      }.getOrNull()
+    } else {
+      null
+    }
+    val resolvedPhoto = com.example.core.util.ProfilePhotoHelper.resolvePhotoUrl(
+      existing?.profilePhotoUrl,
+      application.profilePhotoUrl,
+      userDocPhoto
+    )
+
     val newMember = BelieverMember(
       memberId = existing?.memberId?.ifBlank { null } ?: "mem_${application.uid}",
       uid = application.uid,
       churchId = application.churchId.ifBlank { existing?.churchId ?: "church_main" },
       membershipId = newMembershipId,
       fullName = application.fullName.ifBlank { existing?.fullName ?: "" },
-      profilePhotoUrl = existing?.profilePhotoUrl ?: "",
+      profilePhotoUrl = resolvedPhoto,
       phoneNumber = application.phoneNumber.ifBlank { existing?.phoneNumber ?: "" },
       email = application.email.ifBlank { existing?.email ?: "" },
       dateOfBirth = application.dateOfBirth.ifBlank { existing?.dateOfBirth ?: "" },
@@ -569,15 +766,17 @@ class MemberRepository(private val db: FirebaseFirestore) {
 
     saveMemberProfile(newMember).getOrThrow()
 
-    db.collection("users").document(application.uid).update(
-      mapOf(
-        "accountStatus" to AccountStatus.APPROVED.name,
-        "membershipId" to newMembershipId,
-        "familyId" to resolvedFamilyId,
-        "profileCompleted" to true,
-        "updatedAt" to FieldValue.serverTimestamp()
-      )
-    ).await()
+    val approvalUserUpdates = hashMapOf<String, Any?>(
+      "accountStatus" to AccountStatus.APPROVED.name,
+      "membershipId" to newMembershipId,
+      "familyId" to resolvedFamilyId,
+      "profileCompleted" to true,
+      "updatedAt" to FieldValue.serverTimestamp()
+    )
+    if (resolvedPhoto.isNotBlank()) {
+      approvalUserUpdates["photoUrl"] = resolvedPhoto
+    }
+    db.collection("users").document(application.uid).update(approvalUserUpdates).await()
 
     newMember
   }

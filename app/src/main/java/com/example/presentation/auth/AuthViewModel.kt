@@ -196,6 +196,7 @@ class AuthViewModel(
           churchId = "church_main",
           accountStatus = initialStatus.name,
           membershipId = resolvedMembershipId,
+          photoUrl = firebaseUser.photoUrl?.toString().orEmpty(),
           profileCompleted = initialCompleted
         )
         userRepository.createUserProfile(newProfile)
@@ -407,6 +408,7 @@ class AuthViewModel(
     familyName: String = "",
     familyMembers: List<com.example.core.model.FamilyMemberEntry> = emptyList(),
     ministryGroup: String = "",
+    profilePhotoUrl: String = "",
     onComplete: () -> Unit
   ) {
     val firebaseUser = authRepository.currentUser ?: return
@@ -422,6 +424,11 @@ class AuthViewModel(
     val churchId = current?.churchId?.ifBlank { null } ?: "church_main"
     val resolvedFamilyId = current?.familyId?.ifBlank { null } ?: "fam_${firebaseUser.uid}"
     val resolvedFamilyName = familyName.trim().ifBlank { "${fullName.trim()} Family" }
+    val resolvedPhotoUrl = com.example.core.util.ProfilePhotoHelper.resolvePhotoUrl(
+      profilePhotoUrl,
+      current?.photoUrl,
+      firebaseUser.photoUrl?.toString()
+    )
 
     registrationError.value = null
     isSubmittingRegistration.value = true
@@ -440,6 +447,7 @@ class AuthViewModel(
           accountStatus = current?.accountStatus ?: AccountStatus.PENDING.name,
           membershipId = membershipId,
           familyId = resolvedFamilyId,
+          photoUrl = resolvedPhotoUrl,
           profileCompleted = true
         )
         userRepository.updateUserProfile(updatedProfile).getOrThrow()
@@ -455,7 +463,8 @@ class AuthViewModel(
           churchId = churchId,
           familyId = resolvedFamilyId,
           familyName = resolvedFamilyName,
-          familyMembers = familyMembers
+          familyMembers = familyMembers,
+          profilePhotoUrl = resolvedPhotoUrl
         ).getOrThrow()
 
         val token = ChurchIdGenerator.verificationTokenFor(membershipId)
@@ -465,6 +474,7 @@ class AuthViewModel(
           churchId = churchId,
           membershipId = membershipId,
           fullName = fullName.trim(),
+          profilePhotoUrl = resolvedPhotoUrl,
           phoneNumber = cleanPhone,
           email = cleanEmail,
           dateOfBirth = dateOfBirth.trim(),

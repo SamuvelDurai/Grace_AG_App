@@ -313,7 +313,7 @@ private fun MetricCard(
           text = count,
           style = MaterialTheme.typography.titleMedium.copy(
             fontWeight = FontWeight.Bold,
-            color = DeepRoyalNavy
+            color = TextDeepNavy
           )
         )
       }
